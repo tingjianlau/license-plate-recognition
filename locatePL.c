@@ -11,16 +11,7 @@
 #include "bmpManage.h"
 #include "preprocess.h"
 
-#define UP		0
-#define DOWN	1
-#define LEFT	2
-#define RIGHT	3
 
-#define BLUE_PL	0   // 蓝底白字车牌
-#define YELLOW_PL	1	 // 黄底黑字车牌
-#define WHITE_PL	2     // 白底黑字车牌
-#define BLACK_PL	3      // 黑底白字车牌
-#define OTHERS_PL	4   // 不是车牌区域
 
 typedef struct bound{
 	int	up;
@@ -36,15 +27,16 @@ int isMatchPLHorClr(int PLColor, BYTE curClr);
 int isMatchPLVerClr(int PLColor, BYTE preClr, BYTE curClr, LONG* bound, LONG PLClrCnt);
 int updateVerBounds(const BYTE* imageArr24, BYTE* locateImageArr,LONG width, LONG height, LONG bound[], int PLColor);
 //************************************
-// Method:    secondLocate			第二次精细定位
+// Method:    secondLocate			第二次精细定位,根据wType的值返回相应的子图
 // Parameter: BYTE * imageArr24		24位真色位图矩阵
+// Parameter: BYTE * imageArr8		8位灰度位图矩阵
 // Parameter: BYTE * locateImageArr	经过第一次粗定位后得到的24位真色位图矩阵
 // Parameter: LONG width
 // Parameter: LONG height
 // Parameter: LONG bound[]			经过第一次粗定位后得到边界，并更新
 // Returns:   BYTE*					提取的粗定位子图矩阵
 //************************************
-BYTE* secondLocate(const BYTE* imageArr24, BYTE* locateImageArr, LONG width, LONG height, LONG bound[]);
+BYTE* secondLocate(const BYTE* imageArr24, const BYTE* imageArr8, BYTE* locateImageArr, LONG width, LONG height, LONG bound[], WORD wType);
 
 //************************************
 // Method:    firstLocate		第一次粗定位
@@ -74,22 +66,20 @@ int checkColor(double b, double g, double r);
 // Returns:   LONG*	
 //************************************
 int		getPLColor(const BYTE* imageArr, LONG width, LONG heigh);
-LONG*	getHorBound(BYTE* imageArr, LONG width, LONG height, LONG bound[]);
-LONG*	getVerBound(BYTE* imageArr, LONG width, LONG height, LONG bound[]);
-void	drawBound(BYTE* bmpArr, LONG width, LONG heigh, LONG bound[]);
-// 检查四个边界是否满足要求
-int		checkBounds(const LONG bound[]);
+
 
 int		locatePL(char* srcFile, char* destFile){
 	FILE	*fpSrc = NULL,
 			*fpDest = NULL;
 	LONG	i, j, k, temp=0;
-	BYTE	*bmpArr8, *bmpArr24, *firstLocateBmpArr, *secLocateBmpArr,*tempArr;
+	BYTE	*bmpArr8, *bmpArr24, *firstLocateBmpArr, *secLocateBmpArr,*tempArr, *rotatePreBmpArr;
 	LONG	origWidht, origHeight, locateWidth, locateHeight;
 	BITMAP_IMAGE bmpImage;
 	LONG	rotateWidth, rotateHeight;
 	const WORD	wTpye = BF_TYPE_24;		//指定提取的对象是8位灰度还是24位真色子图		
 	LONG	bound[4] = {0};			// 四个边界，分别代表上下左右
+	HSV*	myHSV = NULL;
+
 	memset(&bmpImage, 0, sizeof(BITMAP_IMAGE));
 
 	fpSrc = loadImage(srcFile, &bmpImage);
@@ -103,7 +93,7 @@ int		locatePL(char* srcFile, char* destFile){
 	//medianFilter(bmpArr, curWidht, curHeight);
 
 	//粗定位
-	firstLocateBmpArr = firstLocate(bmpArr8, bmpArr24, origWidht, origHeight, bound,wTpye);
+	firstLocateBmpArr = firstLocate(bmpArr8, bmpArr24, origWidht, origHeight, bound, BF_TYPE_24);
 
 	if(checkBounds(bound) == 0){
 		//printErrors("粗定位失败");
@@ -111,21 +101,28 @@ int		locatePL(char* srcFile, char* destFile){
 	}
 
 	//精定位
-	secLocateBmpArr = secondLocate(bmpArr24, firstLocateBmpArr, origWidht, origHeight, bound);
+	secLocateBmpArr = secondLocate(bmpArr24, bmpArr8, firstLocateBmpArr, origWidht, origHeight, bound, wTpye);
 	if(checkBounds(bound) == 0 || secLocateBmpArr==NULL){
 		//printErrors("定位失败");
 		return 1;
 	}
 	//printf("update success\n");
 	//printf("%d %d \n", bound[UP], bound[DOWN]);
-	secLocateBmpArr = RotateRGB(secLocateBmpArr, -2, bound[RIGHT]-bound[LEFT]+1,bound[UP]-bound[DOWN]+1,&rotateWidth,&rotateHeight);
+	//secLocateBmpArr = RotateRGB(secLocateBmpArr, -2, bound[RIGHT]-bound[LEFT]+1,bound[UP]-bound[DOWN]+1,&rotateWidth,&rotateHeight);
 
-	/*bmpImage.infoHeader.biHeight = bound[UP]-bound[DOWN]+1;
-	bmpImage.infoHeader.biWidth = bound[RIGHT]-bound[LEFT]+1;*/
-	bmpImage.infoHeader.biHeight= rotateHeight;
-	bmpImage.infoHeader.biWidth = rotateWidth;
+	bmpImage.infoHeader.biHeight = bound[UP]-bound[DOWN]+1;
+	bmpImage.infoHeader.biWidth = bound[RIGHT]-bound[LEFT]+1;
+	locateWidth = bmpImage.infoHeader.biWidth;
+	locateHeight = bmpImage.infoHeader.biHeight;
+	/*bmpImage.infoHeader.biHeight= rotateHeight;
+	bmpImage.infoHeader.biWidth = rotateWidth;*/
 
-	creatBmpByArr(destFile, &bmpImage, secLocateBmpArr, wTpye);
+	//rotatePreBmpArr = rotatePre(secLocateBmpArr, bmpImage.infoHeader.biWidth, bmpImage.infoHeader.biHeight);
+	//myHSI = RGB2HSI(secLocateBmpArr, bmpImage.infoHeader.biWidth, bmpImage.infoHeader.biHeight, myHSI);
+	
+	
+	
+	creatBmpByArr(destFile, &bmpImage, secLocateBmpArr, 24);
 	
 	printSuccess("locatePL");
 	free(bmpArr8);
@@ -220,7 +217,7 @@ int		checkRunLenRatio(const BYTE* imageArr, LONG height, LONG width, LONG curLin
 	return 0;
 }
 
-LONG*	getHorBound(BYTE* imageArr, LONG width, LONG height, LONG bound[]){
+LONG*	getHorBound(const BYTE* imageArr, LONG width, LONG height, LONG bound[]){
 	int		i, j, k, m, n,q=0, tempCnt=0;
 	//const BYTE	JUMP_SUM_MIN = 12, JUMP_SUM_MAX = 30;	//黑白跳变的个数
 	const BYTE	JUMP_SUM_MIN = 12, JUMP_SUM_MAX = 3000;	//黑白跳变的个数
@@ -303,7 +300,7 @@ LONG*	getHorBound(BYTE* imageArr, LONG width, LONG height, LONG bound[]){
 }
 
 //LONG*	getVerPos(BYTE* imageArr, LONG width, LONG height, LONG down, LONG up, LONG* left, LONG* right){
-LONG*	getVerBound(BYTE* imageArr, LONG width, LONG height, LONG bound[]){
+LONG*	getVerBound(const BYTE* imageArr, LONG width, LONG height, LONG bound[]){
 	double	RATION = 3.5;
 	LONG	iHeight = bound[0]-bound[1]+1;
 	LONG	iWidth	= 0;
@@ -371,7 +368,21 @@ BYTE*	locatePre(const BYTE* imageArr, LONG width, LONG height){
 	return bmpArr;
 }
 
-BYTE*	firstLocate(BYTE* imageArr8, const BYTE* imageArr24,LONG width, LONG height, LONG	bound[], WORD wType){
+BYTE*	rotatePre(const BYTE* imageArr, LONG width, LONG height) {
+	BYTE*	bmpArr;
+	bmpArr = rgbToGray(imageArr, width, height);
+	medianFilter(bmpArr, width, height);
+
+	//sobleSideEnhance(bmpArr, width, height);
+
+	binarization(bmpArr, width, height);
+
+	//removeNoise(bmpArr, width, height);
+
+	return bmpArr;
+}
+
+BYTE*	firstLocate(BYTE* imageArr8, const BYTE* imageArr24, LONG width, LONG height, LONG	bound[], WORD wType) {
 	BYTE*	locateBmpArr;
 	getHorBound(imageArr8, width, height, bound);
 	getVerBound(imageArr8, width, height, bound);
@@ -390,7 +401,7 @@ BYTE*	firstLocate(BYTE* imageArr8, const BYTE* imageArr24,LONG width, LONG heigh
 
 }
 
-BYTE*	secondLocate(const BYTE* imageArr24, BYTE* locateImageArr, LONG width, LONG height, LONG bound[]){
+BYTE*	secondLocate(const BYTE* imageArr24, const BYTE* imageArr8, BYTE* locateImageArr, LONG width, LONG height, LONG bound[], WORD wType){
 	int		PLColor;
 	LONG locateWidth = bound[UP]-bound[DOWN]+1;
 	LONG locateHeight = bound[RIGHT]-bound[LEFT]+1;
@@ -407,7 +418,11 @@ BYTE*	secondLocate(const BYTE* imageArr24, BYTE* locateImageArr, LONG width, LON
 	updateHorBounds(imageArr24, locateImageArr, width, height, bound, PLColor);
 	updateVerBounds(imageArr24, locateImageArr, width, height, bound, PLColor); // 再一次更新上下边界，主要是为了车牌是倾斜的情况
 
-	return extractBmpByBound(imageArr24, width, height, bound, BF_TYPE_24);
+	// 从灰度图中提取子图
+	return (wType == 8) ? extractBmpByBound(imageArr8, width, height, bound, BF_TYPE_8)
+							: extractBmpByBound(imageArr24, width, height, bound, BF_TYPE_24);
+	// 从24色位图中提取子图
+	
 }
 
 int		updateHorBounds(const BYTE* imageArr24, BYTE* locateImageArr,LONG width, LONG height, LONG	bound[], int PLColor){

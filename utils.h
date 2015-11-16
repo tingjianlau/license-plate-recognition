@@ -1,6 +1,13 @@
 #ifndef _UTILS_H_
 #define _UTILS_H_
 
+#define	MAX_2(a, b) (( (a) > (b) )? (a) : (b) ) 
+#define	MIn_2(a, b) (( (a) < (b) )? (a) : (b) )
+
+#define	MAX_3(a, b, c) ( ( (a) > (b) ) ?( (a) > (c) ? (a) : (c) ):( (b) > (c) ? (b) : (c) ))
+#define	MIN_3(a, b, c) ( ( (a) < (b) ) ?( (a) < (c) ? (a) : (c) ):( (b) < (c) ? (b) : (c) ))
+
+#define	PI 3.141592653
 // 打印一维数组
 void	printArr(int* nums, int numsSize);
 void	printArrDbe(double* nums, int numsSize);

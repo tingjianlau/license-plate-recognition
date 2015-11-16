@@ -19,6 +19,20 @@
 #define CAR_NUM_PATH "F:\\deep learning\\BPNetwork\\trainNetwork\\carNum.txt"
 #define TEST_FEATRUES_PATH "F:\\deep learning\\BPNetwork\\testNetwork\\features.txt"
 
+typedef	struct His
+{
+	double	H;
+	double	S;
+	double	I;
+}HSI, *PHSI;
+
+typedef	struct Hiv
+{
+	double	H;		// 色调hue
+	double	S;		// 饱和度saturation
+	double	V;		// 亮度value
+}HSV, *PHSV;
+
 //************************************
 // Method:    GetBmpHeader 获取位图的头信息
 // Parameter: FILE * fpBmp
@@ -106,4 +120,8 @@ BYTE	getMedianValue(BYTE* nums, int numsSize, int maxValue);
 // Returns:   BYTE*					返回提取到的图像数组
 //************************************
 BYTE* extractBmpByBound(const BYTE* bmpArr, LONG widht, LONG height, LONG bound[], WORD wType);
+
+HSI*  RGB2HSI(const BYTE * imageArr24, LONG width, LONG height);
+
+HSV* 	RGB2HSV(const BYTE* imageArr24, LONG width, LONG height);
 #endif

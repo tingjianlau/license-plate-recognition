@@ -20,6 +20,7 @@
   <ItemGroup>
     <ClCompile Include="fileManage.c" />
     <ClCompile Include="locatePL.c" />
+    <ClCompile Include="locatePL_Clr.c" />
     <ClCompile Include="main.c" />
     <ClCompile Include="preprocess.c" />
     <ClCompile Include="test.c" />

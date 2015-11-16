@@ -3,7 +3,9 @@
 #include <stdlib.h>
 
 #include "bitmapStruct.h"
+#include "bmpManage.h"
 #include "utils.h"
+#include "math.h"
 
 #define UP		0
 #define DOWN	1
@@ -235,4 +237,90 @@ void	checkBmp(const PBITMAP_IMAGE bmpImage){
 		printf("Error:This 8bit bitmap file is not BI_RGB type!\n");
 		exit(0);
 	}
+}
+
+HSI* 	RGB2HSI(const BYTE* imageArr24, LONG width, LONG height) {
+	HSI* myHSI;
+	double	th, R, G, B, min, max, tmp, tmp2;
+	LONG	i, j, k, tmpIndex;
+
+	myHSI = (HSI*)calloc(width*height, sizeof(HSI));
+	for (i = 0, k=0; i < height; i++)
+	{
+		for ( j = 0; j < width; j++, k++)
+		{
+			tmpIndex = 3 * (i*width + j);
+			B = imageArr24[tmpIndex] / 255.0;	// 取得b,g,r的值，并归一化
+			G = imageArr24[tmpIndex+1] / 255.0;
+			R = imageArr24[tmpIndex+2] / 255.0;
+
+			min = MIN_3(B, G, R);
+			max = MAX_3(B, G, R);
+			myHSI[k].I = (B + G + R) / 3.0;
+
+			if (myHSI[k].I == 0 || max == min)
+			{
+				// this is a black image or grayscale image
+				myHSI[k].S = 0;
+				myHSI[k].H = 0;
+			}
+			else
+			{
+				myHSI[k].S = 1 - min / myHSI[k].I;
+				th = sqrt((R - G)*(R - G) + (R - B)*(R - B) + (G - B)*(G - B));
+				//th = sqrt((R - G)*(R - G) + (R - B)*(G - B));
+				th = acos(((R - G) + (R - B)) * 0.5 / th);
+				myHSI[k].H = (G >= B) ? th : 2 * PI - th;
+			}
+			//printf("%lf %lf %lf \n", myHSI[k].H, myHSI[k].I, myHSI[k].S);
+		}
+	}
+	return myHSI;
+}
+
+HSV* 	RGB2HSV(const BYTE* imageArr24, LONG width, LONG height) {
+	HSV*	myHSV;
+	double	th, R, G, B, min, max, tmp, tmp2;
+	LONG	i, j, k, tmpIndex;
+	const int HMax = 60;	// 代表色调的个数
+	myHSV = (HSV*)calloc(width*height, sizeof(HSV));
+	for (i = 0, k = 0; i < height; i++)
+	{
+		for (j = 0; j < width; j++, k++)
+		{
+			tmpIndex = 3 * (i*width + j);
+			B = imageArr24[tmpIndex] / 255.0;	// 取得b,g,r的值，并归一化
+			G = imageArr24[tmpIndex + 1] / 255.0;
+			R = imageArr24[tmpIndex + 2] / 255.0;
+
+			min = MIN_3(B, G, R);
+			max = MAX_3(B, G, R);
+			
+			myHSV[k].S = (max == 0) ? 0 : (max - min) / max;
+			myHSV[k].V = max;
+			if (max == min)
+			{
+				myHSV[k].H = 0;
+			} 
+			else if (R == max && G >= B)
+			{
+				myHSV[k].H = (G - B) / (max - min) * HMax ;
+			}
+			else if (R == max && G < B)
+			{
+				myHSV[k].H = (6 + (G - B) / (max - min)) * HMax;
+			}
+			else if (G == max)
+			{
+				myHSV[k].H = (2 + (B - R)/ (max - min) ) * HMax;
+			}
+			else if (B == max)
+			{
+				myHSV[k].H = (4 + (R - G) / (max - min)) * HMax;
+			}
+
+			//printf("%lf %lf %lf \n", myHSV[k].H, myHSV[k].S, myHSV[k].V);
+		}
+	}
+	return myHSV;
 }

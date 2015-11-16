@@ -7,8 +7,7 @@
 #include	"preprocess.h"
 #include	"utils.h"
 
-
-#define ROOT_PATH "D:\\study&work\\deep learning\\LPR\\"
+#define ROOT_PATH "F:\\deep learning\\LPR\\"
 #define IMAGE_LIST_FILE "image list.txt"
 #define SOURCE_FOLDER	"source\\"
 #define RGB_TO_GRAY_FOLDER "rgbToGray\\"
@@ -17,6 +16,7 @@
 #define BINAR_FOLDER "binarization\\"
 #define BOUND_LOCATION "bounds\\"
 #define LOCATION_PL "locatePL\\"
+#define LOCATION_PL_CLR "locatePL_Clr\\"
 
 #define PATH_MAX	100
 
@@ -24,7 +24,7 @@ void goGoGo(char* src, int begin, int end);		//实验图片的张数
 
 int main(){
 	
-	goGoGo(LOCATION_PL ,2, 2);
+	goGoGo(LOCATION_PL_CLR,1, 2);
 	
 	return 0;
 }
@@ -57,16 +57,17 @@ void goGoGo(char* src, int begin, int end){
 			if (cnt>=begin && cnt<=end){
 				strcat(source, imageFname);
 				strcat(dest, imageFname);
-				locatePL(source, dest);
+				//locatePL(source, dest);
+				locatePL_clr(source, dest);
 				printf("%s \n",imageFname);
 				strcpy(source, temp1);
 				strcpy(dest, temp2);
 			}
 			if(cnt>=end) break;
 		}
+		fclose(fpImgList);
 	}
-	fclose(fpImgList);
-
+	
 	printf("totally handle %d photos! \n", end-begin+1);
 	return;
 }

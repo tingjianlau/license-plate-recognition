@@ -17,6 +17,17 @@
 #define TRAIN_MODE 0	//训练模式
 #define TEST_MODE 1		//测试模式
 
+#define UP		0
+#define DOWN	1
+#define LEFT	2
+#define RIGHT	3
+
+#define BLUE_PL	0   // 蓝底白字车牌
+#define YELLOW_PL	1	 // 黄底黑字车牌
+#define WHITE_PL	2     // 白底黑字车牌
+#define BLACK_PL	3      // 黑底白字车牌
+#define OTHERS_PL	4   // 不是车牌区域
+
 //************************************
 // Method:    locatePre			车牌定位之前的预处理:原图->灰度化->中值滤波->二值化
 // Parameter: BYTE * imageArr
@@ -25,6 +36,8 @@
 // Returns:   BYTE*				返回预处理后的图像数组
 //************************************
 BYTE* locatePre(const BYTE* imageArr, LONG width, LONG height);
+
+BYTE * rotatePre(const BYTE * imageArr, LONG width, LONG height);
 
  //************************************
  // Method:    rgbToGray 输出给定图片的灰度化后的数据区数组，要求输入的是24位的真彩色的图片
@@ -84,6 +97,8 @@ BYTE* locatePre(const BYTE* imageArr, LONG width, LONG height);
  //车牌定位
 int		locatePL(char* srcFile, char* destFile);
 
+
+int		locatePL_clr(char* srcFile, char* destFile);
 //int binarization(char* srcFile, char* destFile);//24位真色图转化为8位灰度图的主要函数
 //
 //int split();
@@ -98,5 +113,9 @@ int		locatePL(char* srcFile, char* destFile);
 //
 ////BP神经网络
 //void trainNetworkMain();
-
+LONG*	getHorBound(const BYTE* imageArr, LONG width, LONG height, LONG bound[]);
+LONG*	getVerBound(const BYTE* imageArr, LONG width, LONG height, LONG bound[]);
+void	drawBound(BYTE* bmpArr, LONG width, LONG heigh, LONG bound[]);
+// 检查四个边界是否满足要求
+int		checkBounds(const LONG bound[]);
 #endif
