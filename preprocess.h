@@ -26,7 +26,8 @@
 #define YELLOW_PL	1	 // 黄底黑字车牌
 #define WHITE_PL	2     // 白底黑字车牌
 #define BLACK_PL	3      // 黑底白字车牌
-#define OTHERS_PL	4   // 不是车牌区域
+#define RED_PL	4      // 黑底白字车牌中的前两个字符可能是红色
+#define OTHERS_PL	5   // 不是车牌区域
 
 //************************************
 // Method:    locatePre			车牌定位之前的预处理:原图->灰度化->中值滤波->二值化
@@ -118,4 +119,7 @@ LONG*	getVerBound(const BYTE* imageArr, LONG width, LONG height, LONG bound[]);
 void	drawBound(BYTE* bmpArr, LONG width, LONG heigh, LONG bound[]);
 // 检查四个边界是否满足要求
 int		checkBounds(const LONG bound[]);
+
+// 直方图均衡化
+int		histogramEqual(BYTE* imageArr8, LONG width, LONG height);
 #endif

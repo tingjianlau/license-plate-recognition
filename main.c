@@ -17,6 +17,10 @@
 #define BOUND_LOCATION "bounds\\"
 #define LOCATION_PL "locatePL\\"
 #define LOCATION_PL_CLR "locatePL_Clr\\"
+#define BLUE_PRO "蓝色前景图\\"
+#define WHITE_PRO "白色前景图\\"
+
+#define TEMP "temp\\"
 
 #define PATH_MAX	100
 
@@ -24,7 +28,7 @@ void goGoGo(char* src, int begin, int end);		//实验图片的张数
 
 int main(){
 	
-	goGoGo(LOCATION_PL_CLR,1, 2);
+	goGoGo(TEMP,11, 20);
 	
 	return 0;
 }

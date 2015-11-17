@@ -124,4 +124,13 @@ BYTE* extractBmpByBound(const BYTE* bmpArr, LONG widht, LONG height, LONG bound[
 HSI*  RGB2HSI(const BYTE * imageArr24, LONG width, LONG height);
 
 HSV* 	RGB2HSV(const BYTE* imageArr24, LONG width, LONG height);
+
+// 膨胀运算:用一个结构元素(一般是3×3的大小)扫描图像中的每一个像素，
+// 用结构元素中的每一个像素与其覆盖的像素做“与”操作，如果都为0，则该像素为0，否则为1
+int		dilation(BYTE* imageArr8, int width, int height);
+// 腐蚀
+int		erosion(BYTE* imageArr8, int width, int height);
+
+// 求在dest位图像素点为255的前提下，两个图像的交集，并更新至dest中
+int		intersection(const BYTE* sorce, BYTE* dest, LONG width, LONG height);
 #endif
