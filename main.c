@@ -20,7 +20,7 @@
 #define BLUE_PRO "蓝色前景图\\"
 #define WHITE_PRO "白色前景图\\"
 
-#define TEMP "temp\\"
+#define TEMP "temp3\\"
 
 #define PATH_MAX	100
 
@@ -28,7 +28,7 @@ void goGoGo(char* src, int begin, int end);		//实验图片的张数
 
 int main(){
 	
-	goGoGo(TEMP,11, 20);
+	goGoGo(TEMP, 1, 100);
 	
 	return 0;
 }

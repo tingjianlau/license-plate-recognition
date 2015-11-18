@@ -10,7 +10,15 @@
 #include "bitmapStruct.h"
 #include "bmpManage.h"
 #include "preprocess.h"
-LONG*	getHorBound_Clr(const BYTE* imageArr, LONG width, LONG height, LONG bound[]);
+
+typedef	struct bounds
+{
+	LONG	up;
+	LONG	down;
+	LONG	left;
+	LONG	right;
+}BOUNDS, *PBOUNDS;
+
 int		judgePLClr(const PHSV myHSV, LONG width, LONG height);
 int		judgePixClr(double H, double S, double V);
 BYTE*	binarization_PLClr(BYTE* imageArr24, LONG width, LONG height, PHSV myHSV, int PLClr);
@@ -19,28 +27,84 @@ int		getProBmp(BYTE* PLProBmpArr8, BYTE* charProBmpArr8, LONG width, LONG height
 BYTE*	getPLEdgeBmpArr(const BYTE* imageArr24, LONG width, LONG height, int PLClr);
 // 如果以当前白色点为中心的九宫格中第一行和最后一行都是黑色点，则将该点置为黑点
 int		removeHorAloneNoise(BYTE* imageArr8, LONG width, LONG height);
-LONG*	getHorBound_CLS(BYTE* imageArr8, LONG width, LONG height, LONG bound[]);
+// 粗定位水平边界，成功返回1，失败返回0
+int		getHorBound_CLS(const BYTE* imageArr8, LONG width, LONG height, PBOUNDS bound);
+// 粗定位垂直平边界，成功返回1，失败返回0
+int		getVerBound_CLS(const BYTE* imageArr8, LONG width, LONG height, PBOUNDS bound);
+int		checkBound(const PBOUNDS bound);
+// 第一次粗定位，0：成功，1：水平定位失败；2:垂直定位失败
+int		firstLocatePL(const BYTE* bmpArr24, LONG width, LONG height, PBOUNDS bound, int PLClr);
+BYTE*	extractBmpByBounds(const BYTE* bmpArr, LONG widht, LONG height, PBOUNDS bound, WORD wType);
+
+int		getHorContiPix(BYTE* imageArr8, LONG width, LONG heigh, PBOUNDS bound);
+// 用一个3*12的矩形逐步探测蓝色前景图，如果白点个数超过阈值，则全部置为白点，否则置为黑点
+int		removeNoise_rect(BYTE* imageArr8, LONG width, LONG heigh);
+//********************************
+// 全局变量
+BITMAP_IMAGE bmpImage;
+BYTE	*PLProBmpArr8;
+BYTE	*charProBmpArr8;
+HSV*	myHSV = NULL;
+
+char*		dest;
 int		locatePL_clr(char* srcFile, char* destFile) {
+	
 	FILE	*fpSrc = NULL,
-		*fpDest = NULL;
+			*fpDest = NULL;
 	LONG	i, j, k, temp = 0;
 	BYTE	*bmpArr8, *bmpArr24, *firstLocateBmpArr, *secLocateBmpArr, *tempArr, *rotatePreBmpArr;
-	
+	int		res;
 	
 	LONG	origWidth, origHeight, locateWidth, locateHeight;
-	BITMAP_IMAGE bmpImage;
+	//BITMAP_IMAGE bmpImage;
 	LONG	rotateWidth, rotateHeight;
 	const WORD	wTpye = BF_TYPE_24;		//指定提取的对象是8位灰度还是24位真色子图		
-	LONG	bound[4] = { 0 };			// 四个边界，分别代表上下左右
+	BOUNDS	bound;			// 四个边界，分别代表上下左右
 	
 	int		PLClr = 0;
+
+	dest = destFile;
 
 	fpSrc = loadImage(srcFile, &bmpImage);
 	bmpArr24 = creatImageArr(fpSrc, &bmpImage);
 	origWidth = bmpImage.infoHeader.biWidth;
 	origHeight = bmpImage.infoHeader.biHeight;
 
-	
+	res = firstLocatePL(bmpArr24, origWidth, origHeight, &bound, PLClr);
+	if (res != 0)
+	{
+		//sobleSideEnhance(PLProBmpArr8, origWidth, origHeight);
+		removeNoise_rect(PLProBmpArr8, origWidth, origHeight);
+		if (getHorContiPix(PLProBmpArr8, origWidth, origHeight, &bound) == 1) {
+			creatBmpByArr(destFile, &bmpImage, PLProBmpArr8, 8);
+		}
+		//dilation(PLProBmpArr8, origWidth, origHeight);
+		//erosion(PLProBmpArr8, origWidth, origHeight);
+		//removeNoise(PLProBmpArr8, origWidth, origHeight);
+		
+	}
+	switch (res)
+	{
+	case 0:
+		printf("粗定位成功\n");
+		/*tempArr = extractBmpByBounds(bmpArr24, origWidth, origHeight, &bound, 24);
+		bmpImage.infoHeader.biWidth = bound.right - bound.left + 1;
+		bmpImage.infoHeader.biHeight = bound.up - bound.down + 1;
+		creatBmpByArr(destFile, &bmpImage, tempArr, 24);*/
+		//free(tempArr);
+		free(PLProBmpArr8);
+		free(charProBmpArr8);
+		free(myHSV);
+		break;
+	case 1:
+		printf("水平定位失败\n");
+		break;
+	case 2:
+		printf("垂直定位失败\n");
+		break;
+	default:
+		break;
+	}
 	//PLClr = judgePLClr(myHSV, origWidht, origHeight);
 	//if (PLClr == -1)
 	//{
@@ -53,21 +117,60 @@ int		locatePL_clr(char* srcFile, char* destFile) {
 	//	printf("当前车的底色是: %d\n",PLClr);
 	//}
 
-	tempArr = getPLEdgeBmpArr(bmpArr24, origWidth, origHeight, PLClr);
-	getHorBound_CLS(tempArr, origWidth, origHeight, bound);
+	
 	//printf("%d \n", PLProBmpArr8[0]);
 	//bmpArr8 = binarization_PLClr(bmpArr24, origWidht, origHeight, myHSV, 0);
 	//medianFilter(bmpArr8, origWidht, origHeight);
-
+	
 	//getHorBound_Clr(bmpArr8,origWidht, origHeight, bound);
 	//getVerBound(bmpArr8, origWidht, origHeight, bound);
 	//drawBound(bmpArr8, origWidht, origHeight, bound);
-	creatBmpByArr(destFile, &bmpImage, tempArr, 8);
+	
 //	printf("%d \n", PLClr);
 
-	free(tempArr);
+	
 
-	return 0;
+	return res;
+}
+
+int		firstLocatePL(const BYTE* bmpArr24, LONG width, LONG height, PBOUNDS bound, int PLClr) {
+	BYTE*	imageArr8;
+	const	double  PLBoxAddRation = 0.35;		// 字符顶部到车牌套的距离
+	int		PLBoxAdd = 0;		// 字符顶部到车牌套的距离
+	LONG	i;
+	int		res = 0;
+
+	imageArr8 = getPLEdgeBmpArr(bmpArr24, width, height, PLClr);
+	if (getHorBound_CLS(imageArr8, width, height, bound) == 0)
+	{
+		res = 1;	// 水平定位失败
+	}
+	else
+	{
+		if (getVerBound_CLS(imageArr8, width, height, bound) == 0)
+		{
+			res = 2;	// 垂直定位失败
+		}
+		else
+		{
+			for (i = 0; i < height; i++)
+			{
+				imageArr8[i*width + bound->left] = 255;
+				imageArr8[i*width + bound->right] = 255;
+			}
+			PLBoxAdd = (bound->up - bound->down) * PLBoxAddRation;
+			bound->up += PLBoxAdd;			// 扩展车牌上下界，使之包含车牌框
+			bound->down -= PLBoxAdd;
+			for (i = 0; i < width; i++)
+			{
+				imageArr8[bound->up*width + i] = 255;
+				imageArr8[bound->down*width + i] = 255;
+			}
+		}
+	}
+	//creatBmpByArr(dest, &bmpImage, PLProBmpArr8, 8);
+	free(imageArr8);
+	return res;
 }
 
 int		judgePLClr(const PHSV myHSV, LONG width, LONG height) {
@@ -168,93 +271,6 @@ int		judgePLCharClr(int PLClr) {
 
 	return PLCharClr;
 }
-LONG*	getHorBound_Clr(const BYTE* imageArr, LONG width, LONG height, LONG bound[]) {
-	int		i, j, k, m, n, q = 0, tempCnt = 0;
-	//const BYTE	JUMP_SUM_MIN = 12, JUMP_SUM_MAX = 30;	//黑白跳变的个数
-	const BYTE	JUMP_SUM_MIN = 10, JUMP_SUM_MAX = 30;	//黑白跳变的个数
-	//const BYTE	JUMP_COUNTER_MIN = 6, JUMP_COUNTER_MAX = 18;	//满足规定距离差的个数
-	const BYTE	JUMP_COUNTER_MIN = 2, JUMP_COUNTER_MAX = 18;	//满足规定距离差的个数
-	//const BYTE	JUMP_DIFF_MIN = 4, JUMP_DIFF_MAX = 25;	//相邻两次黑白跳的距离差
-	const BYTE	JUMP_DIFF_MIN = 0, JUMP_DIFF_MAX = 25;	//相邻两次黑白跳的距离差
-	const LONG	SPEC_LINE_MIN = 15, SPEC_LINE_MAX = 90;	//满足所有要求的短间隔连续行的上下界
-	LONG*	iJumpSum = (LONG*)calloc(height, sizeof(LONG));	// 记录第j行的黑白跳变次数
-	LONG*	iJumpLocation = (LONG*)calloc(width / 2 + 1, sizeof(LONG));	//记录当前行发生黑白跳变的位置
-	LONG*	iJumpDiff = (LONG*)calloc(width / 2 + 1, sizeof(LONG));		//记录两次黑白跳变的间隔
-	LONG*	tempPos = (LONG*)calloc(height, sizeof(LONG));
-	//LONG*	iJumpCouter = (LONG*)calloc(width/2+1, sizeof(LONG));		//记录满足规定距离差的个数
-	LONG	iJumpCouter = 0;
-	LONG	iDown = -1, iUp = -1;
-	//LONG*	iJumpLocation = (LONG*)calloc(width)*height, sizeof(LONG));
-	int flag = 1;
-	for (j = 0; j<height; ++j) {
-		for (i = 1, k = 0; i<width; ++i) {
-			if (imageArr[j*width + i] - imageArr[j*width + i - 1] == -255) {
-				++iJumpSum[j];
-				iJumpLocation[k++] = i - 1;
-			}
-		}
-		if (iJumpSum[j] >= JUMP_SUM_MIN && iJumpSum[j] <= JUMP_SUM_MAX) {
-			iJumpCouter = 0;
-			++tempCnt;
-			for (m = 0; m<k - 1; ++m) {//计算相邻两次黑白跳变的距离差
-				iJumpDiff[m] = iJumpLocation[m + 1] - iJumpLocation[m];
-			}
-
-			for (n = 0; n<k - 1; ++n) {
-				if (iJumpDiff[n]>JUMP_DIFF_MIN && iJumpDiff[n]<JUMP_DIFF_MAX) {
-					++iJumpCouter;
-				}
-				else {
-					if (iJumpCouter >= JUMP_COUNTER_MIN && iJumpCouter <= JUMP_COUNTER_MAX) {
-						//if (checkRunLenRatio(imageArr, height, width, j) == 1) {
-							tempPos[q++] = j;
-							
-						//}
-						break;
-					}
-					else {
-						iJumpCouter = 0;
-					}
-				}
-			}
-		}
-	}
-	tempCnt = 0;
-	iDown = tempPos[0];
-	for (i = 0; i<q - 1; i++) {
-		if (tempPos[i + 1] - tempPos[i] <= 3) {
-			++tempCnt;
-		}
-		else {
-			if (tempCnt >= SPEC_LINE_MIN && tempCnt <= SPEC_LINE_MAX) {
-				iUp = tempPos[i];
-				break;
-			}
-			else {
-				iDown = tempPos[i + 1];
-				tempCnt = 0;
-			}
-		}
-
-	}
-	if (i <= q && tempCnt >= SPEC_LINE_MIN && tempCnt <= SPEC_LINE_MAX) {
-		iUp = tempPos[i];
-	}
-	bound[0] = iUp;
-	bound[1] = iDown;
-	if (iUp <= iDown) {
-		printf("水平定位失败");
-	}
-	else {
-		printSuccess("getHorPos");
-	}
-	free(iJumpSum);
-	free(iJumpLocation);
-	free(iJumpDiff);
-	free(tempPos);
-
-	return NULL;
-}
 
 int		getProBmp(BYTE* PLProBmpArr8, BYTE* charProBmpArr8, LONG width, LONG height, PHSV myHSV, int PLClr) {
 	LONG	totalPixls = width*height;
@@ -278,13 +294,14 @@ int		getProBmp(BYTE* PLProBmpArr8, BYTE* charProBmpArr8, LONG width, LONG height
 BYTE*	getPLEdgeBmpArr(const BYTE* imageArr24, LONG width, LONG height, int PLClr) {
 	LONG	totalPixls = width*height;
 	int		i , j;
-	BYTE	*PLProBmpArr8 = (BYTE*)calloc(totalPixls, sizeof(BYTE));
-	BYTE	*charProBmpArr8 = (BYTE*)calloc(totalPixls, sizeof(BYTE));
-	HSV*	myHSV = NULL;
+	
+	
 	BYTE*	imageArr8;
 	// RGB颜色空间转成HSV空间
 	myHSV = RGB2HSV(imageArr24, width, height);
-	
+	PLProBmpArr8 = (BYTE*)calloc(totalPixls, sizeof(BYTE));
+	charProBmpArr8 = (BYTE*)calloc(totalPixls, sizeof(BYTE));
+
 	// 车牌定位第一步：获取蓝色和白色前景图
 	getProBmp(PLProBmpArr8, charProBmpArr8, width, height, myHSV, PLClr);
 	
@@ -315,9 +332,9 @@ BYTE*	getPLEdgeBmpArr(const BYTE* imageArr24, LONG width, LONG height, int PLClr
 	removeHorAloneNoise(imageArr8, width, height);
 	//dilation(imageArr8, width, height);
 	
-	//free(PLProBmpArr8);
-	//free(charProBmpArr8);
-	free(myHSV);
+	/*free(PLProBmpArr8);
+	free(charProBmpArr8);
+	free(myHSV);*/
 
 	//printf("%d ", PLProBmpArr8[0]);
 	return imageArr8;
@@ -482,108 +499,34 @@ int		removeHorAloneNoise(BYTE* imageArr8, LONG width, LONG height) {
 	}
 }
 
-LONG*	getHorBound_CLS(BYTE* imageArr8, LONG width, LONG height, LONG bound[]) {
+int		getHorBound_CLS(const BYTE* imageArr8, LONG width, LONG height, PBOUNDS bound) {
 	int		i, j, k, m, n, q = 0, tempCnt = 0;
-	const BYTE	JUMP_SUM_MIN = 10, JUMP_SUM_MAX = 3000;			//黑白跳变的个数
-	const BYTE	JUMP_COUNTER_MIN = 2, JUMP_COUNTER_MAX = 18;	//满足规定距离差的个数
-	const BYTE	JUMP_DIFF_MIN = 2, JUMP_DIFF_MAX = 25;	//相邻两次黑白跳的距离差
-	const LONG	SPEC_LINE_MIN = 15, SPEC_LINE_MAX = 90;	//满足所有要求的短间隔连续行的上下界
+	const BYTE	JUMP_SUM_MIN = 10;			//黑白跳变的个数
+	const LONG	SPEC_LINE_MIN = 10;	//满足所有要求的短间隔连续行的上下界
 	LONG*	iJumpSum = (LONG*)calloc(height, sizeof(LONG));	// 记录第j行的黑白跳变次数
-	LONG*	iJumpLocation = (LONG*)calloc(width / 2 + 1, sizeof(LONG));	//记录当前行发生黑白跳变的位置
-	LONG*	iJumpDiff = (LONG*)calloc(width / 2 + 1, sizeof(LONG));		//记录两次黑白跳变的间隔
 	LONG*	tempPos = (LONG*)calloc(height, sizeof(LONG));
-	//LONG*	iJumpCouter = (LONG*)calloc(width/2+1, sizeof(LONG));		//记录满足规定距离差的个数
-	LONG	iJumpCouter = 0;
 	LONG	iDown = -1, iUp = -1;
-	//LONG*	iJumpLocation = (LONG*)calloc(width)*height, sizeof(LONG));
-	int flag = 1;
-	//for (j = 0; j<height; ++j) {
-	//	for (i = 1, k = 0; i<width; ++i) {
-	//		if (imageArr8[j*width + i] - imageArr8[j*width + i - 1] == 255) {
-	//			++iJumpSum[j];
-	//			iJumpLocation[k++] = i - 1;
-	//		}
-	//	}
-	//	if (iJumpSum[j] >= JUMP_SUM_MIN) {
-	//		iJumpCouter = 0;
-	//		++tempCnt;
-	//		for (m = 0; m<k - 1; m += 2) {//计算相邻两次黑白跳变的距离差
-	//			iJumpDiff[m/2] = iJumpLocation[m + 1] - iJumpLocation[m];
-	//		}
-
-	//		for (n = 0; n<k/2; ++n) {
-	//			if (iJumpDiff[n]>JUMP_DIFF_MIN && iJumpDiff[n]<JUMP_DIFF_MAX) {
-	//				++iJumpCouter;
-	//			}
-	//			else {
-	//				if (iJumpCouter >= JUMP_COUNTER_MIN && iJumpCouter <= JUMP_COUNTER_MAX) {
-	//					//if (checkRunLenRatio(imageArr, height, width, j) == 1) {
-	//						tempPos[q++] = j;
-	//						for ( n = 0; n < width; n++)
-	//						{
-	//							imageArr8[j*width + n] = 255;
-	//						}
-	//						
-	//					//}
-	//					break;
-	//				}
-	//				else {
-	//					iJumpCouter = 0;
-	//				}
-	//			}
-	//		}
-	//	}
-	//}
-	for (j = 0; j<height; ++j) {
+	
+	for (j = 0, q=0; j<height; ++j) {
 		for (i = 1, k = 0; i<width; ++i) {
 			if (imageArr8[j*width + i] - imageArr8[j*width + i - 1] == 255) {
 				++iJumpSum[j];
-				iJumpLocation[k++] = i - 1;
 			}
-		}
-		if (iJumpSum[j] >= JUMP_SUM_MIN) {
-			iJumpCouter = 0;
-			++tempCnt;
-			for (n = 0; n < width; n++)
-			{
-				imageArr8[j*width + n] = 255;
-			}
-			//for (m = 0; m<k - 1; m++) {//计算相邻两次黑白跳变的距离差
-			//	iJumpDiff[m] = iJumpLocation[m + 1] - iJumpLocation[m];
-			//}
-
-			//for (n = 0; n<k-1; ++n) {
-			//	if (iJumpDiff[n]>JUMP_DIFF_MIN && iJumpDiff[n]<JUMP_DIFF_MAX) {
-			//		++iJumpCouter;
-			//	}
-			//	
-				//else {
-				//	if (iJumpCouter >= JUMP_COUNTER_MIN && iJumpCouter <= JUMP_COUNTER_MAX) {
-				//		//if (checkRunLenRatio(imageArr, height, width, j) == 1) {
-				//		tempPos[q++] = j;
-				//		for (n = 0; n < width; n++)
-				//		{
-				//			imageArr8[j*width + n] = 255;
-				//		}
-
-				//		//}
-				//		break;
-				//	}
-				//	else {
-				//		iJumpCouter = 0;
-				//	}
-				//}
 		}
 		
+		if (iJumpSum[j] >= JUMP_SUM_MIN) {
+			tempPos[q++] = j;
+		}
 	}
-	/*tempCnt = 0;
+	tempCnt = 0;
 	iDown = tempPos[0];
 	for (i = 0; i<q - 1; i++) {
-		if (tempPos[i + 1] - tempPos[i] <= 3) {
+		if (tempPos[i + 1] - tempPos[i] <= 5) { // 放松标准，防止由于车牌区域中间某些行不满足要求而判错
 			++tempCnt;
 		}
-		else {
-			if (tempCnt >= SPEC_LINE_MIN && tempCnt <= SPEC_LINE_MAX) {
+		else 
+		{
+			if (tempCnt >= SPEC_LINE_MIN) {
 				iUp = tempPos[i];
 				break;
 			}
@@ -594,45 +537,288 @@ LONG*	getHorBound_CLS(BYTE* imageArr8, LONG width, LONG height, LONG bound[]) {
 		}
 
 	}
-	if (i <= q && tempCnt >= SPEC_LINE_MIN && tempCnt <= SPEC_LINE_MAX) {
+	if (i <= q && tempCnt >= SPEC_LINE_MIN) {
 		iUp = tempPos[i];
 	}
-	bound[0] = iUp;
-	bound[1] = iDown;
-	if (iUp <= iDown) {
-		printf("水平定位失败");
+	if (iUp > iDown)		// 使得车牌的边界扩展至包括车牌边框位置
+	{
+		/*bound->up = (iUp - iDown) * PLBoxAddRation + iUp;
+		bound->down = iDown - (iUp - iDown) * PLBoxAddRation;*/
+		bound->up =iUp;
+		bound->down = iDown;
+		return 1;
 	}
-	else {
-		printSuccess("getHorPos");
-	}*/
+	else
+	{
+		bound->up = iUp;
+		bound->down = iDown;
+	}
+	
 	free(iJumpSum);
-	free(iJumpLocation);
-	free(iJumpDiff);
 	free(tempPos);
 
-	return NULL;
+	return 0;
 }
 
-//LONG*	getHorBound_CLS(BYTE* imageArr8, LONG width, LONG height, LONG bound[]) {
-//	int		i, j, k, m, n, q = 0, tempCnt = 0;
-//	LONG*	iJumpSum = (LONG*)calloc(height, sizeof(LONG));
-//	const BYTE	JUMP_SUM_MIN = 10;
-//
-//	for (j = 0; j<height; ++j) {
-//		for (i = 1, k = 0; i<width; ++i) {
-//			if (imageArr8[j*width + i] - imageArr8[j*width + i - 1] == 255) {
-//				++iJumpSum[j];
-//				//iJumpLocation[k++] = i - 1;
-//			}
-//		}
-//		if (iJumpSum[j] >= JUMP_SUM_MIN) {
-//			//iJumpCouter = 0;
-//			//++tempCnt;
-//			for (n = 0; n < width; n++)
-//			{
-//				imageArr8[j*width + n] = 255;
-//			}
-//		}
-//
-//	}
-//}
+int		getVerBound_CLS(const BYTE* imageArr, LONG width, LONG height, PBOUNDS bound) {
+	double	RATION = 4.0;
+	LONG	iHeight = bound->up - bound->down + 1;
+	LONG	iWidth = 0;
+	LONG	iPerWidth = iWidth / 7;
+	int		STEP = 5;
+	LONG	i, j, k;
+	int		whiteCnt[7] = { 0 };
+	double		totalPerBoxPixs = 0.0;
+	//const	double	WHITE_RATIO_MIN = 0;			// 白点所在的比例
+	const	double	WHITE_CNT_MIN = 10;
+	const	double	WHITE_RATIO_MAX = 1;
+	int		flag = 1;
+	int		tmpCnt = 0;
+	bound->left = -1;
+	bound->right = -1;
+
+	while (1) {
+		iWidth = (LONG)iHeight*RATION;
+		totalPerBoxPixs = iHeight*iWidth / 7;
+		iPerWidth = iWidth / 7 + 1;
+		for (k = 0; k<width - STEP; k += STEP) {// 每次向前移动5个像素
+			for (j = bound->down; j <= bound->up; ++j) {//上下边界
+				for (i = k; i<iWidth + k; ++i) {//车牌宽度范围内进行检查
+					if (imageArr[j*width + i] == 255) { //统计7个小盒子中的白点个数
+						++whiteCnt[(i - k) / iPerWidth];
+					}
+				}
+			}
+			for (j = 0; j<7; ++j) {
+				if (whiteCnt[j] < WHITE_CNT_MIN) {
+					//if (whiteCnt[j] / totalPerBoxPixs<WHITE_RATIO_MIN || whiteCnt[j] / totalPerBoxPixs>WHITE_RATIO_MAX) {
+					flag = 0;
+					break;
+				}
+			}
+			if (flag == 1) {		// 找到垂直边界
+				bound->left = k;
+				bound->right = k + iWidth;
+				// 扩展右边界的范围
+
+				for (k = bound->right; k < width - iPerWidth; k += iPerWidth) {// 每次向前移动5个像素
+					flag = 0;
+					for (j = bound->down; j <= bound->up; ++j) {//上下边界
+						for (i = k; i < iPerWidth + k; ++i) {//车牌宽度范围内进行检查
+							if (imageArr[j*width + i] == 255) { //统计当前个小盒子中的白点个数
+								tmpCnt++;
+								if (tmpCnt >= WHITE_CNT_MIN)
+								{
+									flag = 1;
+									break;
+								}
+							}
+						}
+					}
+					if (flag == 1)
+					{
+						bound->right += iPerWidth;
+					}
+					else
+					{
+						break;
+					}
+				}
+				//printf("======%d %d\n", bound->left, bound->right);
+				return 1;
+			}
+			for (j = 0; j<7; ++j) {
+				whiteCnt[j] = 0;
+			}
+			flag = 1;
+		}
+		RATION += 0.5;		// 调节宽度
+		if (RATION >= 5) {
+			break;
+		}
+	}
+	
+	
+	/*for (i = 0; i < origHeight; i++)
+	{
+		tempArr[i*origWidth + bound.left] = 255;
+		tempArr[i*origWidth + bound.right] = 255;
+	}*/
+	//printf("垂直定位失败");
+	return 0;
+}
+
+int		checkBound(const PBOUNDS bound) {
+	return (bound->up > bound->down && bound->right > bound->left);
+}
+
+BYTE*	extractBmpByBounds(const BYTE* bmpArr, LONG widht, LONG height, PBOUNDS bound, WORD wType) {
+	int		flag = (wType == 8) ? 1 : 3;
+	BYTE	*tempArr = (BYTE *)calloc((bound->up - bound->down + 1)*(bound->right - bound->left + 1)*flag, sizeof(BYTE));
+	int		i, j, k, g;
+	LONG	tmpIndex;
+
+	if (bound->up>bound->down && bound->right>bound->left) { // 满足要求的定位边界
+		for (i = bound->down, k = 0; i <= bound->up; ++i) {
+			for (j = bound->left; j <= bound->right; ++j) {
+				if (wType == 8) {
+					tempArr[k++] = bmpArr[i*widht + j];
+				}
+				else if (wType == 24) {
+					tmpIndex = (i*widht + j) * 3;
+					tempArr[k] = bmpArr[tmpIndex];  // 注意此处的赋值
+					tempArr[k + 1] = bmpArr[tmpIndex + 1];
+					tempArr[k + 2] = bmpArr[tmpIndex + 2];
+					k += 3;
+				}
+			}
+		}
+	}
+	return tempArr;
+}
+
+int		removeNoise_rect(BYTE* imageArr8, LONG width, LONG heigh) {
+	const	int	rectHeight = 3;
+	const	int rectWidth = 10;
+	int		i, j, m, n;
+	int		reqTotalPixs = (int)rectWidth*rectHeight*0.5; 
+	int		cnt = 0;
+	for ( i = 0; i < heigh; i+= rectHeight)
+	{
+		for ( j = 0; j < width; j+= rectWidth)
+		{
+			cnt = 0;
+			for ( m = i; m < i+ rectHeight; m++)
+			{
+				for ( n = j; n < j+rectWidth; n++)
+				{
+					if (imageArr8[m*width+n] == 255)
+					{
+						cnt++;
+					}
+				}
+			}
+			if (cnt < reqTotalPixs)
+			{
+				for (m = i; m < i + rectHeight; m++)
+				{
+					for (n = j; n < j + rectWidth; n++)
+					{
+						imageArr8[m*width + n] = 0;
+					}
+				}
+			}
+			else
+			{
+				/*for (m = i; m < i + rectHeight; m++)
+				{
+					for (n = j; n < j + rectWidth; n++)
+					{
+						imageArr8[m*width + n] = 255;
+					}
+				}*/
+			}
+		}
+	}
+}
+
+int		getHorContiPix(BYTE* imageArr8, LONG width, LONG heigh, PBOUNDS bound) {
+	LONG	i, j, k, q,t;
+	LONG	*pos = (LONG*)calloc(width, sizeof(LONG)); // 记录每行白点的位置
+	LONG	*line = (LONG*)calloc(width, sizeof(LONG));	//记录每行连续白点数量超过一定阈值的行
+	LONG	tempCnt = 0;
+	const	double  PLBoxAddRation = 0.35;		// 字符顶部到车牌套的距离
+	int		PLBoxAdd = 0;		// 字符顶部到车牌套的距离
+	const	LONG	CNT_MIN = 10;			// 每行连续白点数量的阈值
+	const	LONG	SPEC_LINE_MIN = 10;		// 连续SPEC_LINE_MIN行满足要求，则判定为车牌区域
+	LONG	iDown = -1, iUp = -1;
+	int		res = 0;
+	for ( i = 0, q=0; i < heigh; i++)
+	{
+		tempCnt = 0;
+		k = 0;
+		for ( j = 0; j < width; j++)
+		{
+			if (imageArr8[i*width+j] == 255)
+			{
+				pos[k++] = j;
+			}
+		}
+		//iDown = pos[0];
+		for (j = 0; j<k - 1; j++) {
+			//printf("%d ", pos[j]);
+			if (pos[j + 1] - pos[j] <= 8) { // 放松标准，防止由于车牌区域中间某些行不满足要求而判错
+				++tempCnt;
+			}
+			else
+			{
+				if (tempCnt >= CNT_MIN) {
+					line[q++] = i;
+					/*for (t = 0; t < width/3; t++)
+					{
+						imageArr8[i*width + t] = 255;
+						imageArr8[i*width + t] = 255;
+					}*/
+					break;
+				}
+				else {
+					
+					tempCnt = 0;
+				}
+			}
+
+		}
+		for ( t = 0; t < k; t++)
+		{
+			pos[i] = 0;
+		}
+		//printf("\n");
+	}
+
+	tempCnt = 0;
+	iDown = line[0];
+	for ( i = 0; i < q-1; i++)
+	{
+		//printf("%d ", line[i]);
+		if (line[i + 1] - line[i] <= 5)
+		{
+			tempCnt++;
+		}
+		else
+		{
+			if (tempCnt >= SPEC_LINE_MIN)
+			{
+				iUp = line[i];
+				break;
+			}
+			else
+			{	
+				iDown = line[i+1];
+				tempCnt = 0;
+			}
+		}
+	}
+	if (i <= q && tempCnt >= SPEC_LINE_MIN) {
+		iUp = line[i];
+	}
+	
+	if (iUp > iDown)
+	{
+		bound->up = iUp;
+		bound->down = iDown;
+		PLBoxAdd = (bound->up - bound->down) * PLBoxAddRation;
+		bound->up += PLBoxAdd;			// 扩展车牌上下界，使之包含车牌框
+		bound->down -= PLBoxAdd;
+		for (j = 0; j < width; j++)
+		{
+			imageArr8[bound->up*width + j] = 255;
+			imageArr8[bound->down*width + j] = 255;
+		}
+		res =  1;
+	}
+
+	free(pos);
+	free(line);
+
+	return res;
+}

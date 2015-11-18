@@ -120,6 +120,7 @@ void	drawBound(BYTE* bmpArr, LONG width, LONG heigh, LONG bound[]);
 // 检查四个边界是否满足要求
 int		checkBounds(const LONG bound[]);
 
+
 // 直方图均衡化
 int		histogramEqual(BYTE* imageArr8, LONG width, LONG height);
 #endif
