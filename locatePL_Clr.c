@@ -30,10 +30,11 @@ int		removeHorAloneNoise(BYTE* imageArr8, LONG width, LONG height);
 // 粗定位水平边界，成功返回1，失败返回0
 int		getHorBound_CLS(const BYTE* imageArr8, LONG width, LONG height, PBOUNDS bound);
 // 粗定位垂直平边界，成功返回1，失败返回0
-int		getVerBound_CLS(const BYTE* imageArr8, LONG width, LONG height, PBOUNDS bound);
+int		getVerBound_CLS(const BYTE* imageArr8, LONG width, LONG height, PBOUNDS bound,double ratio);
 int		checkBound(const PBOUNDS bound);
 // 第一次粗定位，0：成功，1：水平定位失败；2:垂直定位失败
 int		firstLocatePL(const BYTE* bmpArr24, LONG width, LONG height, PBOUNDS bound, int PLClr);
+int		secLocatePL(BYTE* PLProBmpArr8, LONG width, LONG height, PBOUNDS bound, int PLClr);
 BYTE*	extractBmpByBounds(const BYTE* bmpArr, LONG widht, LONG height, PBOUNDS bound, WORD wType);
 
 int		getHorContiPix(BYTE* imageArr8, LONG width, LONG heigh, PBOUNDS bound);
@@ -53,7 +54,7 @@ int		locatePL_clr(char* srcFile, char* destFile) {
 			*fpDest = NULL;
 	LONG	i, j, k, temp = 0;
 	BYTE	*bmpArr8, *bmpArr24, *firstLocateBmpArr, *secLocateBmpArr, *tempArr, *rotatePreBmpArr;
-	int		res;
+	int		res, status = 0;
 	
 	LONG	origWidth, origHeight, locateWidth, locateHeight;
 	//BITMAP_IMAGE bmpImage;
@@ -66,58 +67,47 @@ int		locatePL_clr(char* srcFile, char* destFile) {
 	dest = destFile;
 
 	fpSrc = loadImage(srcFile, &bmpImage);
+	//printBmpHeader(&bmpImage);
 	bmpArr24 = creatImageArr(fpSrc, &bmpImage);
 	origWidth = bmpImage.infoHeader.biWidth;
 	origHeight = bmpImage.infoHeader.biHeight;
-
-	res = firstLocatePL(bmpArr24, origWidth, origHeight, &bound, PLClr);
-	if (res != 0)
+	for (PLClr = 0; PLClr < 2                                                                          ; PLClr++)
 	{
-		//sobleSideEnhance(PLProBmpArr8, origWidth, origHeight);
-		removeNoise_rect(PLProBmpArr8, origWidth, origHeight);
-		if (getHorContiPix(PLProBmpArr8, origWidth, origHeight, &bound) == 1) {
-			creatBmpByArr(destFile, &bmpImage, PLProBmpArr8, 8);
+		res = firstLocatePL(bmpArr24, origWidth, origHeight, &bound, PLClr);
+		if (res == 0)
+		{	// 第一次定位成功
+			break;
+			status = 1;
 		}
-		//dilation(PLProBmpArr8, origWidth, origHeight);
-		//erosion(PLProBmpArr8, origWidth, origHeight);
-		//removeNoise(PLProBmpArr8, origWidth, origHeight);
-		
-	}
-	switch (res)
-	{
-	case 0:
-		printf("粗定位成功\n");
-		/*tempArr = extractBmpByBounds(bmpArr24, origWidth, origHeight, &bound, 24);
-		bmpImage.infoHeader.biWidth = bound.right - bound.left + 1;
-		bmpImage.infoHeader.biHeight = bound.up - bound.down + 1;
-		creatBmpByArr(destFile, &bmpImage, tempArr, 24);*/
-		//free(tempArr);
-		free(PLProBmpArr8);
-		free(charProBmpArr8);
-		free(myHSV);
-		break;
-	case 1:
-		printf("水平定位失败\n");
-		break;
-	case 2:
-		printf("垂直定位失败\n");
-		break;
-	default:
-		break;
-	}
-	//PLClr = judgePLClr(myHSV, origWidht, origHeight);
-	//if (PLClr == -1)
-	//{
-	//	printf("判断车牌的底色失败 \n");
-	//	//free(myHSV);
-	//	//return 1;
-	//}
-	//else
-	//{
-	//	printf("当前车的底色是: %d\n",PLClr);
-	//}
+		if (res != 0)
+		{	// 第一次定位失败
+			bound.up = -1;		// 初始边界，避免第一次定位失败对第二次定位的影响
+			bound.down = -1;
+			bound.left = -1;
+			bound.right = -1;
+			res = secLocatePL(PLProBmpArr8, origWidth, origHeight, &bound, PLClr);
+			//creatBmpByArr(destFile, &bmpImage, PLProBmpArr8, 8);
+			if (res == 0)
+			{ // 第二次定位成功
 
-	
+			  /*for (i = 0; i < origHeight; i++)
+			  {
+			  PLProBmpArr8[i*origWidth + bound.left] = 255;
+			  PLProBmpArr8[i*origWidth + bound.right] = 255;
+			  }
+			  for (i = 0; i < origWidth; i++)
+			  {
+			  PLProBmpArr8[bound.up*origWidth + i] = 255;
+			  PLProBmpArr8[bound.down*origWidth + i] = 255;
+			  }*/
+			  //creatBmpByArr(destFile, &bmpImage, PLProBmpArr8, 8);
+				
+				status = 2;
+				break;
+			}
+		}
+	}
+	printf("车牌颜色为: %d \n", PLClr);
 	//printf("%d \n", PLProBmpArr8[0]);
 	//bmpArr8 = binarization_PLClr(bmpArr24, origWidht, origHeight, myHSV, 0);
 	//medianFilter(bmpArr8, origWidht, origHeight);
@@ -127,10 +117,19 @@ int		locatePL_clr(char* srcFile, char* destFile) {
 	//drawBound(bmpArr8, origWidht, origHeight, bound);
 	
 //	printf("%d \n", PLClr);
-
+	if (res == 0)
+	{  // 定位成功
+		tempArr = extractBmpByBounds(bmpArr24, origWidth, origHeight, &bound, 24);
+		bmpImage.infoHeader.biWidth = bound.right - bound.left + 1;
+		bmpImage.infoHeader.biHeight = bound.up - bound.down + 1;
+		creatBmpByArr(destFile, &bmpImage, tempArr, 24);
+		free(tempArr);
+	}
 	
-
-	return res;
+	free(PLProBmpArr8);
+	free(charProBmpArr8);
+	free(myHSV);
+	return status;
 }
 
 int		firstLocatePL(const BYTE* bmpArr24, LONG width, LONG height, PBOUNDS bound, int PLClr) {
@@ -147,29 +146,66 @@ int		firstLocatePL(const BYTE* bmpArr24, LONG width, LONG height, PBOUNDS bound,
 	}
 	else
 	{
-		if (getVerBound_CLS(imageArr8, width, height, bound) == 0)
+		if (getVerBound_CLS(imageArr8, width, height, bound, 4.0) == 0)
 		{
 			res = 2;	// 垂直定位失败
 		}
 		else
 		{
-			for (i = 0; i < height; i++)
+			/*for (i = 0; i < height; i++)
 			{
 				imageArr8[i*width + bound->left] = 255;
 				imageArr8[i*width + bound->right] = 255;
-			}
+			}*/
 			PLBoxAdd = (bound->up - bound->down) * PLBoxAddRation;
 			bound->up += PLBoxAdd;			// 扩展车牌上下界，使之包含车牌框
 			bound->down -= PLBoxAdd;
-			for (i = 0; i < width; i++)
+			if (bound->up > height)
+			{
+				bound->up = height;
+			}
+			if (bound->down < 0)
+			{
+				bound->down = 0;
+			}
+			/*for (i = 0; i < width; i++)
 			{
 				imageArr8[bound->up*width + i] = 255;
 				imageArr8[bound->down*width + i] = 255;
-			}
+			}*/
 		}
 	}
 	//creatBmpByArr(dest, &bmpImage, PLProBmpArr8, 8);
 	free(imageArr8);
+	return res;
+}
+
+int		secLocatePL(BYTE* PLProBmpArr8w, LONG width, LONG height, PBOUNDS bound, int PLClr) {
+	int		res = 1;
+	LONG	i, j;
+	const	double  PLBoxAddRation = 0.35;		// 字符顶部到车牌套的距离
+	int		PLBoxAdd = 0;		// 字符顶部到车牌套的距离
+	removeNoise_rect(PLProBmpArr8, width, height);
+
+	if (getHorContiPix(PLProBmpArr8, width, height, bound) == 1) {
+		
+		res = 2;
+		if (getVerBound_CLS(PLProBmpArr8, width, height, bound, 4.0) == 1) {
+			PLBoxAdd = (bound->up - bound->down) * PLBoxAddRation;
+			bound->up += PLBoxAdd;			// 扩展车牌上下界，使之包含车牌框
+			bound->down -= PLBoxAdd;
+
+			if (bound->up > height)
+			{
+				bound->up = height;
+			}
+			if (bound->down < 0)
+			{
+				bound->down = 0;
+			}
+			res = 0;
+		}
+	}
 	return res;
 }
 
@@ -275,17 +311,36 @@ int		judgePLCharClr(int PLClr) {
 int		getProBmp(BYTE* PLProBmpArr8, BYTE* charProBmpArr8, LONG width, LONG height, PHSV myHSV, int PLClr) {
 	LONG	totalPixls = width*height;
 	int		i;
-	
-	for (i = 0; i<totalPixls; ++i)
+	int		curClr;
+	if (PLClr != WHITE_PL)
 	{
-		if (judgePixClr(myHSV[i].H, myHSV[i].S, myHSV[i].V) == PLClr) {
-			PLProBmpArr8[i] = 255;
-		}
-		else if (judgePixClr(myHSV[i].H, myHSV[i].S, myHSV[i].V) == judgePLCharClr(PLClr))
+		for (i = 0; i<totalPixls; ++i)
 		{
-			charProBmpArr8[i] = 255;
+			curClr = judgePixClr(myHSV[i].H, myHSV[i].S, myHSV[i].V);
+			if (curClr == PLClr) {
+				PLProBmpArr8[i] = 255;
+			}
+			else if (curClr == judgePLCharClr(PLClr))
+			{
+				charProBmpArr8[i] = 255;
+			}
 		}
 	}
+	else // 白底黑字的车牌前两个字符可能是红色
+	{
+		for (i = 0; i<totalPixls; ++i)
+		{
+			curClr = judgePixClr(myHSV[i].H, myHSV[i].S, myHSV[i].V);
+			if (curClr == PLClr || curClr == RED_PL) {
+				PLProBmpArr8[i] = 255;
+			}
+			else if (curClr == judgePLCharClr(PLClr))
+			{
+				charProBmpArr8[i] = 255;
+			}
+		}
+	}
+	
 	//medianFilter(PLProBmpArr8, width, height);
 	//medianFilter(PLProBmpArr8, width, height);
 	return 0;
@@ -560,8 +615,8 @@ int		getHorBound_CLS(const BYTE* imageArr8, LONG width, LONG height, PBOUNDS bou
 	return 0;
 }
 
-int		getVerBound_CLS(const BYTE* imageArr, LONG width, LONG height, PBOUNDS bound) {
-	double	RATION = 4.0;
+int		getVerBound_CLS(const BYTE* imageArr, LONG width, LONG height, PBOUNDS bound, double ratio) {
+	//double	ratio = 3.0;
 	LONG	iHeight = bound->up - bound->down + 1;
 	LONG	iWidth = 0;
 	LONG	iPerWidth = iWidth / 7;
@@ -576,9 +631,9 @@ int		getVerBound_CLS(const BYTE* imageArr, LONG width, LONG height, PBOUNDS boun
 	int		tmpCnt = 0;
 	bound->left = -1;
 	bound->right = -1;
-
+	//printf("\n%d %d \n", bound->up, bound->down);
 	while (1) {
-		iWidth = (LONG)iHeight*RATION;
+		iWidth = (LONG)iHeight*ratio;
 		totalPerBoxPixs = iHeight*iWidth / 7;
 		iPerWidth = iWidth / 7 + 1;
 		for (k = 0; k<width - STEP; k += STEP) {// 每次向前移动5个像素
@@ -618,6 +673,10 @@ int		getVerBound_CLS(const BYTE* imageArr, LONG width, LONG height, PBOUNDS boun
 					if (flag == 1)
 					{
 						bound->right += iPerWidth;
+						if (bound->right > width) // 防止越界
+						{
+							bound->right = width;
+						}
 					}
 					else
 					{
@@ -632,8 +691,8 @@ int		getVerBound_CLS(const BYTE* imageArr, LONG width, LONG height, PBOUNDS boun
 			}
 			flag = 1;
 		}
-		RATION += 0.5;		// 调节宽度
-		if (RATION >= 5) {
+		ratio += 0.5;		// 调节宽度
+		if (ratio >= 5) {
 			break;
 		}
 	}
@@ -683,10 +742,14 @@ int		removeNoise_rect(BYTE* imageArr8, LONG width, LONG heigh) {
 	int		i, j, m, n;
 	int		reqTotalPixs = (int)rectWidth*rectHeight*0.5; 
 	int		cnt = 0;
-	for ( i = 0; i < heigh; i+= rectHeight)
+	for ( i = 0; i < heigh- rectHeight; i+= rectHeight)
 	{
-		for ( j = 0; j < width; j+= rectWidth)
+		for ( j = 0; j < width- rectWidth; j+= rectWidth)
 		{
+	/*for (i = rectHeight; i < heigh - rectHeight; i += rectHeight)
+	{
+		for (j = rectWidth; j < width - rectWidth; j += rectWidth)
+		{*/
 			cnt = 0;
 			for ( m = i; m < i+ rectHeight; m++)
 			{
@@ -754,6 +817,7 @@ int		getHorContiPix(BYTE* imageArr8, LONG width, LONG heigh, PBOUNDS bound) {
 			{
 				if (tempCnt >= CNT_MIN) {
 					line[q++] = i;
+					//printf("%d ", line[q-1]);
 					/*for (t = 0; t < width/3; t++)
 					{
 						imageArr8[i*width + t] = 255;
@@ -806,17 +870,19 @@ int		getHorContiPix(BYTE* imageArr8, LONG width, LONG heigh, PBOUNDS bound) {
 	{
 		bound->up = iUp;
 		bound->down = iDown;
-		PLBoxAdd = (bound->up - bound->down) * PLBoxAddRation;
-		bound->up += PLBoxAdd;			// 扩展车牌上下界，使之包含车牌框
-		bound->down -= PLBoxAdd;
-		for (j = 0; j < width; j++)
+		
+		//PLBoxAdd = (int)(iUp - iDown) * PLBoxAddRation;
+		//bound->up += PLBoxAdd;			// 扩展车牌上下界，使之包含车牌框
+		//bound->down -= PLBoxAdd;
+		//printf("\n %d %d %d %d \n", iUp, iDown, bound->up, bound->down);
+		/*for (j = 0; j < width; j++)
 		{
 			imageArr8[bound->up*width + j] = 255;
 			imageArr8[bound->down*width + j] = 255;
-		}
+		}*/
 		res =  1;
 	}
-
+	
 	free(pos);
 	free(line);
 
