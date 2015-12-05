@@ -21,7 +21,7 @@ typedef struct bound{
 }BOUNDS;
 
 
-BYTE *RotateRGB(BYTE *image, float iRotateAngle,LONG width,LONG height,LONG *lwidth,LONG *lheight);
+
 int updateHorBounds(const BYTE* imageArr24, BYTE* locateImageArr,LONG width, LONG height, LONG bound[], int PLColor);
 int isMatchPLHorClr(int PLColor, BYTE curClr);
 int isMatchPLVerClr(int PLColor, BYTE preClr, BYTE curClr, LONG* bound, LONG PLClrCnt);
@@ -108,7 +108,7 @@ int		locatePL(char* srcFile, char* destFile){
 	}
 	//printf("update success\n");
 	//printf("%d %d \n", bound[UP], bound[DOWN]);
-	//secLocateBmpArr = RotateRGB(secLocateBmpArr, -2, bound[RIGHT]-bound[LEFT]+1,bound[UP]-bound[DOWN]+1,&rotateWidth,&rotateHeight);
+	//secLocateBmpArr = rotateRGB(secLocateBmpArr, -2, bound[RIGHT]-bound[LEFT]+1,bound[UP]-bound[DOWN]+1,&rotateWidth,&rotateHeight);
 
 	bmpImage.infoHeader.biHeight = bound[UP]-bound[DOWN]+1;
 	bmpImage.infoHeader.biWidth = bound[RIGHT]-bound[LEFT]+1;
@@ -359,7 +359,7 @@ BYTE*	locatePre(const BYTE* imageArr, LONG width, LONG height){
 	bmpArr = rgbToGray(imageArr, width, height);
 	medianFilter(bmpArr, width, height);
 
-	sobleSideEnhance(bmpArr, width, height);
+	sobleSideEnhance(bmpArr, width, height, 2);
 
 	binarization(bmpArr, width, height);
 
@@ -373,7 +373,7 @@ BYTE*	rotatePre(const BYTE* imageArr, LONG width, LONG height) {
 	bmpArr = rgbToGray(imageArr, width, height);
 	medianFilter(bmpArr, width, height);
 
-	//sobleSideEnhance(bmpArr, width, height);
+	//sobleSideEnhance(bmpArr, width, height, 2);
 
 	binarization(bmpArr, width, height);
 
@@ -641,7 +641,7 @@ void	medianFilter(BYTE* imageArr, LONG width, LONG height){
 	printSuccess("medianFilter");
 }
 
-void	sobleSideEnhance(BYTE* imageArr, LONG width, LONG height){
+void	sobleSideEnhance(BYTE* imageArr, LONG width, LONG height, int mode){
 	int		x, y,
 			pixel_x, pixel_y, pixel; //分别代表经横向及纵向边缘检测的图像灰度值
 	BYTE*	tempArr = (BYTE*)calloc(width*height, sizeof(BYTE));
@@ -654,19 +654,30 @@ void	sobleSideEnhance(BYTE* imageArr, LONG width, LONG height){
 			pixel_y = (imageArr[(y-1)*width+x+1] + 2*imageArr[y*width+x+1] + 
 				imageArr[(y+1)*width+x+1]) - (imageArr[(y-1)*width+x-1] +
 				2*imageArr[y*width+x-1] + imageArr[(y+1)*width+x-1]);
-
-			//pixel =  abs(pixel_x)+abs(pixel_y);
-			pixel =  abs(pixel_y);		// 只进行垂直边缘加强
+			if (mode == 0)
+			{
+				pixel =  abs(pixel_x)+abs(pixel_y);
+			}
+			else if (mode == 1)
+			{
+				pixel = abs(pixel_x);
+			}
+			else if (mode == 2)
+			{
+				pixel = abs(pixel_y);		// 只进行垂直边缘加强
+			}
+			
 			pixel = pixel > 255 ? 255 : pixel;
 			
 			tempArr[y*width+x] = (BYTE)pixel;	// 不能直接将pixel写入目标数组中，否则会导致算子的原图数据错误
 		}
 	}
-	for (y=1; y<height-1; ++y){
+	memcpy((BYTE*)imageArr, (BYTE*)tempArr, width*height*sizeof(BYTE));
+	/*for (y=1; y<height-1; ++y){
 		for (x=1; x<width-1; ++x){
 			imageArr[y*width+x] = tempArr[y*width+x];
 		}
-	}
+	}*/
 
 	free(tempArr);
 	printSuccess("sobleSideEnhance");
@@ -964,118 +975,4 @@ int		isMatchPLHorClr(int PLColor, BYTE curClr){
 	return flag;
 }
 
-BYTE *RotateRGB(BYTE *image, float iRotateAngle,LONG width,LONG height,LONG *lwidth,LONG *lheight)  
-{  
 
-	int		i,j,k,m,n;   
-	long    lNewWidth;  
-	long    lNewHeight;  
-	float	gray;  
-	long    i0;  
-	long    j0;  
-	float   fRotateAngle;  
-	float   fSina, fCosa;  
-	float   fSrcX1,fSrcY1,fSrcX2,fSrcY2,fSrcX3,fSrcY3,fSrcX4,fSrcY4;  
-	float   fDstX1,fDstY1,fDstX2,fDstY2,fDstX3,fDstY3,fDstX4,fDstY4;  
-	BYTE* temp;
-	float   f1,f2;  
-	float carCos[] = {  
-		1.000000, 0.999848, 0.999391, 0.998630, 0.997564, 0.996195, 0.994522, 0.992546, 0.990268, 0.987688, 0.984808, 0.981627, 0.978148, 0.974370, 0.970296, 0.965926,   
-		0.961262, 0.956305, 0.951057, 0.945519, 0.939693, 0.933580, 0.927184, 0.920505, 0.913545, 0.906308, 0.898794, 0.891007, 0.882948, 0.874620, 0.866025, 0.857167,   
-		0.848048, 0.838671, 0.829038, 0.819152, 0.809017, 0.798636, 0.788011, 0.777146, 0.766044, 0.754710, 0.743145, 0.731354, 0.719340, 0.707107, 0.694658, 0.681998,   
-		0.669131, 0.656059, 0.642788, 0.629320, 0.615662, 0.601815, 0.587785, 0.573576, 0.559193, 0.544639, 0.529919, 0.515038, 0.500000, 0.484810, 0.469472, 0.453991,   
-		0.438371, 0.422618, 0.406737, 0.390731, 0.374607, 0.358368, 0.342020, 0.325568, 0.309017, 0.292372, 0.275637, 0.258819, 0.241922, 0.224951, 0.207912, 0.190809,   
-		0.173648, 0.156434, 0.139173, 0.121869, 0.104528, 0.087156, 0.069757, 0.052336, 0.034900, 0.017452, 0.000000, -0.017452, -0.034899, -0.052336, -0.069756, -0.087156,   
-		-0.104528, -0.121869, -0.139173, -0.156434, -0.173648, -0.190809, -0.207912, -0.224951, -0.241922, -0.258819, -0.275637, -0.292372, -0.309017, -0.325568, -0.342020, -0.358368,   
-		-0.374607, -0.390731, -0.406737, -0.422618, -0.438371, -0.453990, -0.469472, -0.484810, -0.500000, -0.515038, -0.529919, -0.544639, -0.559193, -0.573576, -0.587785, -0.601815,   
-		-0.615661, -0.629320, -0.642788, -0.656059, -0.669131, -0.681998, -0.694658, -0.707107, -0.719340, -0.731354, -0.743145, -0.754710, -0.766044, -0.777146, -0.788011, -0.798635,   
-		-0.809017, -0.819152, -0.829038, -0.838671, -0.848048, -0.857167, -0.866025, -0.874620, -0.882948, -0.891007, -0.898794, -0.906308, -0.913545, -0.920505, -0.927184, -0.933580,   
-		-0.939693, -0.945519, -0.951056, -0.956305, -0.961262, -0.965926, -0.970296, -0.974370, -0.978148, -0.981627, -0.984808, -0.987688, -0.990268, -0.992546, -0.994522, -0.996195,   
-		-0.997564, -0.998630, -0.999391, -0.999848, -1.000000  
-	};  
-
-	float carSin[] = {  
-		0.000000, 0.017452, 0.034899, 0.052336, 0.069756, 0.087156, 0.104528, 0.121869, 0.139173, 0.156434, 0.173648, 0.190809, 0.207912, 0.224951, 0.241922, 0.258819,   
-		0.275637, 0.292372, 0.309017, 0.325568, 0.342020, 0.358368, 0.374607, 0.390731, 0.406737, 0.422618, 0.438371, 0.453990, 0.469472, 0.484810, 0.500000, 0.515038,   
-		0.529919, 0.544639, 0.559193, 0.573576, 0.587785, 0.601815, 0.615661, 0.629320, 0.642788, 0.656059, 0.669131, 0.681998, 0.694658, 0.707107, 0.719340, 0.731354,   
-		0.743145, 0.754710, 0.766044, 0.777146, 0.788011, 0.798635, 0.809017, 0.819152, 0.829038, 0.838671, 0.848048, 0.857167, 0.866025, 0.874620, 0.882948, 0.891007,   
-		0.898794, 0.906308, 0.913545, 0.920505, 0.927184, 0.933580, 0.939693, 0.945519, 0.951056, 0.956305, 0.961262, 0.965926, 0.970296, 0.974370, 0.978148, 0.981627,   
-		0.984808, 0.987688, 0.990268, 0.992546, 0.994522, 0.996195, 0.997564, 0.998630, 0.999391, 0.999848, 1.000000, 0.999848, 0.999391, 0.998630, 0.997564, 0.996195,   
-		0.994522, 0.992546, 0.990268, 0.987688, 0.984808, 0.981627, 0.978148, 0.974370, 0.970296, 0.965926, 0.961262, 0.956305, 0.951057, 0.945519, 0.939693, 0.933580,   
-		0.927184, 0.920505, 0.913545, 0.906308, 0.898794, 0.891007, 0.882948, 0.874620, 0.866025, 0.857167, 0.848048, 0.838671, 0.829038, 0.819152, 0.809017, 0.798636,   
-		0.788011, 0.777146, 0.766044, 0.754710, 0.743145, 0.731354, 0.719340, 0.707107, 0.694658, 0.681998, 0.669131, 0.656059, 0.642788, 0.629320, 0.615662, 0.601815,   
-		0.587785, 0.573576, 0.559193, 0.544639, 0.529919, 0.515038, 0.500000, 0.484810, 0.469472, 0.453991, 0.438371, 0.422618, 0.406737, 0.390731, 0.374607, 0.358368,   
-		0.342020, 0.325568, 0.309017, 0.292372, 0.275637, 0.258819, 0.241922, 0.224951, 0.207912, 0.190809, 0.173648, 0.156435, 0.139173, 0.121869, 0.104529, 0.087156,   
-		0.069757, 0.052336, 0.034900, 0.017452, 0.000000  
-	}; 
-
-	if(iRotateAngle >= 0)  
-	{  
-		fSina = (float)carSin[(int)iRotateAngle];  
-		fCosa = (float)carCos[(int)iRotateAngle];  
-	}  
-	else  
-	{  
-		fSina = 0 - (float)carSin[0 -(int)iRotateAngle];  
-		fCosa = (float)carCos[0 - (int)iRotateAngle];  
-	}  
-
-	fSrcX1 = (float) (- (width  - 1) / 2);  
-	fSrcY1 = (float) (  (height - 1) / 2);  
-	fSrcX2 = (float) (  (width  - 1) / 2);  
-	fSrcY2 = (float) (  (height - 1) / 2);  
-	fSrcX3 = (float) (- (width  - 1) / 2);  
-	fSrcY3 = (float) (- (height - 1) / 2);  
-	fSrcX4 = (float) (  (width  - 1) / 2);  
-	fSrcY4 = (float) (- (height - 1) / 2);  
-
-
-	fDstX1 =  fCosa * fSrcX1 + fSina * fSrcY1;  
-	fDstY1 = -fSina * fSrcX1 + fCosa * fSrcY1;  
-	fDstX2 =  fCosa * fSrcX2 + fSina * fSrcY2;  
-	fDstY2 = -fSina * fSrcX2 + fCosa * fSrcY2;  
-	fDstX3 =  fCosa * fSrcX3 + fSina * fSrcY3;  
-	fDstY3 = -fSina * fSrcX3 + fCosa * fSrcY3;  
-	fDstX4 =  fCosa * fSrcX4 + fSina * fSrcY4;  
-	fDstY4 = -fSina * fSrcX4 + fCosa * fSrcY4;  
-
-	lNewWidth  = (long) ( fMax( fabs(fDstX4 - fDstX1), fabs(fDstX3 - fDstX2) ) + 0.5);  
-
-	lNewHeight = (long) ( fMax( fabs(fDstY4 - fDstY1), fabs(fDstY3 - fDstY2) )  + 0.5);  
-	//unsigned char *temp=myMalloc(lNewHeight*lNewWidth*3,0,0);  
-	temp=(BYTE*)calloc(lNewHeight*lNewWidth*3,sizeof(BYTE));  
-
-	f1 = (float) (-0.5 * (lNewWidth - 1) * fCosa - 0.5 * (lNewHeight - 1) * fSina  
-		+ 0.5 * (width  - 1));  
-	f2 = (float) ( 0.5 * (lNewWidth - 1) * fSina - 0.5 * (lNewHeight - 1) * fCosa  
-		+ 0.5 * (height - 1));  
-
-	for(i = 0; i < lNewHeight; i++)  
-	{  
-		for(m=0,j = 0;j < lNewWidth,m<lNewWidth*3;m+=3,j++)  
-		{  
-			i0 = (long) (-((float) j) * fSina + ((float) i) * fCosa + f2 + 0.5);  
-			j0 = (long) ( ((float) j) * fCosa + ((float) i) * fSina + f1 + 0.5);  
-
-			if( (j0 >= 0) && (j0 < width) && (i0 >= 0) && (i0 < height))  
-			{  
-				n=i0 * width * 3 + j0 * 3;  
-				*(temp + lNewWidth * i * 3 + m + 1) = *(image + n + 1);  
-				*(temp + lNewWidth * i * 3 + m + 2) = *(image + n + 2);  
-				*(temp + lNewWidth * i * 3 + m) = *(image + n);  
-			}  
-			else  
-			{  
-				*(temp + lNewWidth * i*3+ m+1)=0;  
-				*(temp + lNewWidth * i*3+ m+2)=0;  
-				*(temp + lNewWidth * i*3+ m)=0;  
-			}  
-		}  
-	}  
-
-	*lwidth = lNewWidth;  
-	*lheight = lNewHeight;  
-
-	return temp;  
-
-}  

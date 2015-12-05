@@ -129,3 +129,56 @@ BYTE	getMedianValue(BYTE* nums, int numsSize, int maxValue){
 float	fMax(float a, float b){
 	return (a>b)?a:b;
 }
+
+double	getMaxValue(const double nums[], int numsSize) {
+	int		i;
+	double	max;
+
+	max = nums[0];
+	for (i = 0; i<numsSize; ++i) {
+		max = (max>nums[i]) ? max : nums[i];
+	}
+
+	return max;
+}
+
+int		getMaxIndex(const double nums[], int numsSize) {
+	int i, maxIndex;
+
+	maxIndex = 0;
+	for (i = 0; i<numsSize; ++i) {
+		maxIndex = (nums[maxIndex]>nums[i]) ? maxIndex : i;
+	}
+
+	return maxIndex;
+}
+
+void exchange(double* a, double* b) {
+	double temp = *a;
+	*a = *b;
+	*b = temp;
+}
+
+int partition(double* A, int p, int r) { // 这种partition方法具有更高的效率，应该优先应用。
+	double x = A[r];
+	int i = p - 1;
+
+	for (int j = p; j<r; ++j) {
+		if (A[j] < x) {
+			++i;
+			exchange(&A[i], &A[j]);
+		}
+	}
+
+	exchange(&A[i + 1], &A[r]);
+	return i + 1;
+}
+
+void quickSort(double* A, int p, int r) {
+	int q;
+	if (p < r) {
+		q = partition(A, p, r);
+		quickSort(A, p, q - 1);
+		quickSort(A, q + 1, r);
+	}
+}

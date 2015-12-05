@@ -28,5 +28,8 @@ double	getExtremumValue(const double nums[], int numsSize, int mode);
 int		getExtremumIndex(const double nums[], int numsSize, int mode);
 
 float	fMax(float a, float b);
+double	getMaxValue(const double nums[], int numsSize);
+int		getMaxIndex(const double nums[], int numsSize);
+void	quickSort(double* A, int p, int r);
 #endif
 

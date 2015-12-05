@@ -64,7 +64,7 @@ FILE*	loadImage(char* src, PBITMAP_IMAGE bmpImage){
 	rewind(fpBmp);
 
 	getBmpHeader(fpBmp, bmpImage); 
-	checkBmp(bmpImage);
+	//checkBmp(bmpImage);
 	//printBmpHeader(bmpImage);
 	//定位到文件数据区
 	fseek(fpBmp, bmpImage->fileHeader.bfOffBits, SEEK_SET);

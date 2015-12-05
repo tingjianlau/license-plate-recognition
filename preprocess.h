@@ -64,9 +64,10 @@ BYTE * rotatePre(const BYTE * imageArr, LONG width, LONG height);
  // Parameter: BYTE * imageArr
  // Parameter: LONG width
  // Parameter: LONG height
+ // Parameter: int mode			边缘检测的模式；0：水平垂直边缘检测，1：水平，2：垂直
  // Returns:   void
  //************************************
- void	sobleSideEnhance(BYTE* imageArr, LONG width, LONG height);
+ void	sobleSideEnhance(BYTE* imageArr, LONG width, LONG height, int mode);
 
  //************************************
  // Method:    binarization		结合直方图和数学期望的全局二值化
@@ -123,4 +124,27 @@ int		checkBounds(const LONG bound[]);
 
 // 直方图均衡化
 int		histogramEqual(BYTE* imageArr8, LONG width, LONG height);
+
+/*旋转RGB图像的主要函数：
+image： 图像数据
+iRotateAngle : 要旋转的角度
+width， height：原始图像的宽度，高度
+lwidth，lheight：旋转后图像的宽度，高度
+*/
+BYTE *rotateRGB(BYTE *image, float iRotateAngle, LONG width, LONG height, LONG *lwidth, LONG *lheight);
+
+int		hough(BYTE* imageArr, int width, int height);
+
+BYTE*	correction(BYTE* imageArr24, LONG width, LONG height, LONG* cWidth, LONG* cWeight);
+void incrementRadon(double *pr, double pixel, double r);
+void	radon(double *radonTable, BYTE *imageArr8, double *thetaPtr, LONG width, LONG height,
+	LONG xOrigin, LONG yOrigin, int numAngles, LONG rFirst, LONG rSize);
+void	myRadon(double *radonTable, BYTE *imageArr8, double *thetaPtr, LONG width, LONG height,
+	LONG xOrigin, LONG yOrigin, int numAngles, LONG rFirst, LONG rSize);
+
+
+int		KTTransform(BYTE *imageArr8, LONG width, LONG height);
+
+BYTE	interpolation(const BYTE* imageArr8, LONG width, LONG height, double x, double y);
+BYTE*	rotate(const BYTE* imageArr8, double fAngle, LONG oldWidth, LONG oldHeight, LONG* newWidth, LONG* newHeight);
 #endif

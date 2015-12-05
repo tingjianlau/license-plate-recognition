@@ -2,6 +2,7 @@
 //*******************************************************************************/
 #include	<stdio.h>
 #include	<string.h>
+#include	<math.h>
 #include	"fileManage.h"
 #include	"bmpManage.h"
 #include	"preprocess.h"
@@ -21,7 +22,7 @@
 #define BLUE_PRO "À¶É«Ç°¾°Í¼\\"
 #define WHITE_PRO "°×É«Ç°¾°Í¼\\"
 
-#define TEMP "temp\\"
+#define TEMP "temp\\1\\"
 
 #define PATH_MAX	100
 
@@ -30,8 +31,95 @@ char*	statusInfo(int status);
 
 
 int main(){
+	//FILE* fp;
+	//BYTE* tempArr, *rotateArr;
+	//BITMAP_IMAGE bmpImage;
+	//LONG	width, height, temp1, temp2;
+	//LONG	xOrigin, yOrigin, rFirst, rSize, i, j, rLast;
+	//int		numAngles;
+	//double	*thetaPtr, *radonTable, *maxArr;
+	//int		angles;
+	//LONG	rotatedWidth = 0, rotatedHeight = 0;
+	//
+	//fp = loadImage("F:\\deep learning\\LPR\\temp\\ÔÆA526EG.BMP", &bmpImage);
+	//tempArr = creatImageArr(fp, &bmpImage);
+	//width = bmpImage.infoHeader.biWidth;
+	//height = bmpImage.infoHeader.biHeight;
+
+	//angles = KTTransform(tempArr, width, height);
+	//rotateArr = rotate(tempArr, -angles, width, height, &rotatedWidth, &rotatedHeight);
+	////printf("%lf \n", cos(2*PI));
+	//bmpImage.infoHeader.biWidth = rotatedWidth;
+	//bmpImage.infoHeader.biHeight = rotatedHeight;
+	//creatBmpByArr("F:\\deep learning\\LPR\\temp\\ÔÆA526EG_2.BMP", &bmpImage, rotateArr, 8);
+	/*angles = hough(tempArr, width, height);
+	printf("%d \n", angles);*/
+	// ===================================
+	//xOrigin = (width-1)/2;
+	//yOrigin = (height - 1) / 2;
+
+	//temp1 = height - 1 - yOrigin;
+	//temp2 = width - 1 - xOrigin;
+	//rLast = (LONG)ceil(sqrt((double)(temp1*temp1 + temp2*temp2))) + 1;
+	//rFirst = -rLast;
+	//rSize = rLast - rFirst + 1;
+
+	//numAngles = 3;
+	////rFirst = 0;
+	////rSize = (LONG)sqrt(width*width + height*height) + 1;
+	//thetaPtr = (double*)calloc(numAngles, sizeof(double));
+	//for (i = 0; i < numAngles; i++)
+	//{
+	//	thetaPtr[i] = i+10;
+	//}
+	//radonTable = (double*)calloc(rSize*numAngles, sizeof(double));
+	//maxArr = (double*)calloc(numAngles, sizeof(double));
+	///*for ( i = 0; i < height; i++)
+	//{
+	//	for ( j = 0; j < width; j++)
+	//	{
+	//		if (tempArr[i*width + j] != 0)
+	//		{
+	//			printf("%d ", tempArr[i*width + j]);
+	//		}
+	//		
+	//	}
+	//}*/
+	//radon(radonTable, tempArr, thetaPtr, width, height, xOrigin, yOrigin, numAngles, rFirst, rSize);
+	////printf("%d ", (LONG)sqrt(width*width + height*height) + 1);
+	//for (i = 0; i < numAngles; i++)
+	//{
+	//	/*for ( j = 0; j < rSize; j++)
+	//	{
+	//		if (radonTable[i*rSize + j] != 0 )
+	//		{
+	//			printf("%.2lf ", radonTable[i*rSize + j]);
+	//		}
+	//		
+	//	}*/
+	//	//quickSort(radonTable + i*rSize, 0, rSize - 1);
+	//	//maxArr[i] = getMaxValue(radonTable + i*rSize, rSize);
+	//	//printf("%lf \n", maxArr[i]);
+	//}
+	//for (i = 0; i < numAngles; i++)
+	//{
+	//	//for (j = 1; j < rSize; j++)
+	//	//{
+	//		//maxArr[i] += fabs(radonTable[i*rSize + j] - radonTable[i*rSize + j-1]);
+	//		maxArr[i] = getMaxValue(radonTable + i*rSize, rSize);
+	//		printf("%lf \n", maxArr[i]);
+	//	//}
+	//}
+	//printf("\n ==%d ", getMaxIndex(maxArr, numAngles));
+	//
+	//maxArr[i] = getMaxValue(radonTable + i*rSize, rSize);
+	// ===================================
+	/*fclose(fp);
+	free(tempArr);
+	free(rotateArr);*/
+	//printf("\n %d ", getMaxIndex(maxArr, numAngles));
 	
-	goGoGo(TEMP, 39, 100);
+	goGoGo(TEMP, 1, 32);
 	
 	return 0;
 }
