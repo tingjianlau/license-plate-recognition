@@ -6,7 +6,7 @@
 #define BI_THRESHOLD 120  // 二值化的阈值
 #define NORMALIZED_WIDTH	24	//归一化后图片的宽
 #define NORMALIZED_HEIGHT	48	//归一化后图片的高
-
+#define SPLIT_SUCCEED 10
 //云AU7526 京H99999 京GT7777.bmp
 
 
@@ -133,4 +133,15 @@ int		erosion(BYTE* imageArr8, int width, int height);
 
 // 求在dest位图像素点为255的前提下，两个图像的交集，并更新至dest中
 int		intersection(const BYTE* sorce, BYTE* dest, LONG width, LONG height);
+
+
+//使用Rosenfeld算法的细化算法
+void thinnerRosenfeld(BYTE *image, LONG width, LONG height);
+void thinnerHilditch(void *image, unsigned long lx, unsigned long ly);
+void thinnerPavlidis(void *image, unsigned long lx, unsigned long ly);
+
+FILE*	openTextFile(char* filename, char* mode);
+
+// 反转二值图
+void	reverseBinImg(BYTE* biImg, LONG width, LONG heigh);
 #endif

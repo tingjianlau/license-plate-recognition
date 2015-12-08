@@ -29,6 +29,14 @@
 #define RED_PL	4      // 黑底白字车牌中的前两个字符可能是红色
 #define OTHERS_PL	5   // 不是车牌区域
 
+#define	LOCATE_FAIL	0	// 车牌定位失败
+#define FIRST_LOCATE_SECC 1 // 第一次车牌定位成功
+#define SEC_LOCATE_SECC 2	// 第二次车牌定位成功
+#define FIRST_LOCATE_SPLIT_SECC 11 // 第一次车牌定位成功且切割成功 
+#define SEC_LOCATE_SPLIT_SECC 21 // 第二次车牌定位成功且切割成功
+#define FIRST_LOCATE_SPLIT_FAIL 10 // 第一次车牌定位成功但切割失败
+#define SEC_LOCATE_SPLIT_FAIL 20 // 第一次车牌定位成功但切割失败
+
 //************************************
 // Method:    locatePre			车牌定位之前的预处理:原图->灰度化->中值滤波->二值化
 // Parameter: BYTE * imageArr
@@ -100,7 +108,7 @@ BYTE * rotatePre(const BYTE * imageArr, LONG width, LONG height);
 int		locatePL(char* srcFile, char* destFile);
 
 
-int		locatePL_clr(char* srcFile, char* destFile);
+BYTE*	locatePL_clr(char* srcFile, char* destFile, int* status);
 //int binarization(char* srcFile, char* destFile);//24位真色图转化为8位灰度图的主要函数
 //
 //int split();
@@ -114,7 +122,7 @@ int		locatePL_clr(char* srcFile, char* destFile);
 //void featuresExtract(char* source);
 //
 ////BP神经网络
-//void trainNetworkMain();
+int  trainNetworkMain(const char* featrueSrc, const char* weightSrc, int sampleCnt);
 LONG*	getHorBound(const BYTE* imageArr, LONG width, LONG height, LONG bound[]);
 LONG*	getVerBound(const BYTE* imageArr, LONG width, LONG height, LONG bound[]);
 void	drawBound(BYTE* bmpArr, LONG width, LONG heigh, LONG bound[]);
@@ -147,4 +155,7 @@ int		KTTransform(BYTE *imageArr8, LONG width, LONG height);
 
 BYTE	interpolation(const BYTE* imageArr8, LONG width, LONG height, double x, double y);
 BYTE*	rotate(const BYTE* imageArr8, double fAngle, LONG oldWidth, LONG oldHeight, LONG* newWidth, LONG* newHeight);
+
+// 特征提取
+void writeFeatures(const char* fileName, FILE* fpFeatures, const BYTE* thinnerImg);
 #endif

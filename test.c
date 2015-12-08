@@ -1,280 +1,209 @@
-///*******************************
-//*函数名称
-//*RotateDIB2()
-//*
-//*参数
-//*  LPSTR lpDIB        -指向原DIB的指针
-//* int iRotateAngle    -旋转的角度
-//*
-//*返回值
+//#define _CRT_SECURE_NO_WARNINGS
+//#include <stdio.h>
+//#include <time.h>
+//#include <math.h>
+//#include <stdlib.h>
 //
-//*HGLOBAL
-//*
-//*说明：
-//*   该函数用来以图象为中心旋转DIB图象，返回新生成DIB的句柄。
-//*调用该函数会自动扩大图象以显示所有的像素。函数中采用双线形插值算法进行插值
-//*
-//***********************************/
-//HGLOBAL WINAPI RotateDIB2(LPSTR lpDIB, int iRotateAngle)
-//{
-//	原图象的高度和宽度
-//	LONG lWidth;
-//	LONG lHeight;
+//#include "util.h"
+//#include "bitmapStruct.h"
+//#include "fileManage.h"
+//#include "preprocess.h"
 //
-//	旋转后的图象高度和宽度
-//	LONG lNewWidth;
-//	LONG lNewHeight;
+//#define SAMPLE_CNT  2 //用来表示已经知道的数据样本的数量,也就是训练样本的数量
+//#define OUTPUT_CNT 34 //表示输出层的输出个数
+//#define NEURON_CNT 20 // 表示隐藏层神经元的数量
+//#define TRAIN_CNT 500 //来表示训练的次数
+//#define A  0.2
+//#define B  0.4
+//#define a  0.2
+//#define b  0.3
 //
-//	旋转后图象的宽度（1NewWidth，必须是4的倍数）
-//	LONG lNewLineBytes;
-//	指向原图象的指针
-//	LPSTR lpDIBBits;
+//double	sampleInput[SAMPLE_CNT][FEATURES_CNT],			//存储SAMPLE_CNT个样本的特征值
+//sampleOutput[SAMPLE_CNT][OUTPUT_CNT] = { 0 },			//存储SAMPLE_CNT个样本车牌号的实际值的概率，只有一个元素为1，其余为0	
+//inputLayerWeight[NEURON_CNT][FEATURES_CNT],		// 表示某个输入对某个神经元的权重
+//outputLayerWeight[OUTPUT_CNT][NEURON_CNT],		// 来表示某个神经元对某个输出的权重
+//activationValue[NEURON_CNT],					// 隐含层的激活值
+//networkOutput[OUTPUT_CNT],						//存储BP神经网络的输出
+//maxIn[FEATURES_CNT], minIn[FEATURES_CNT],
+//maxOut[OUTPUT_CNT], minOut[OUTPUT_CNT],
+//outputLayerWeightDiff[OUTPUT_CNT][NEURON_CNT],	//某个神经元对某个输出的权重的修正量
+//inputLayerWeightDiff[NEURON_CNT][FEATURES_CNT];	//输入对某个神经元的权重的修正量
+//double	e;	//误差
+//int		realNumIndex[SAMPLE_CNT] = { 0 };		//指定sampleOutput元素为1时的下标
 //
-//	指向原像数的指针
-//	LPSTR lpSrc;
 //
-//	旋转后新DIB句柄
-//	HDIB hDIB;
+//												//读取所有样本的特征值和实际输出对应的编号
+//void readData(char* fileName, int mode) {
+//	FILE *fpFeatures, *fpCarNum, *fpWeight;
+//	int i, j;
+//	double	temp;
 //
-//	指向旋转图象对应像数的指针
-//	LPSTR lpDst;
+//	//fpFeatures = openTextFile(TRAIN_FEATRUES_PATH, "r");
+//	fpFeatures = openTextFile(fileName, "r");
+//	for (i = 0;i<SAMPLE_CNT;i++)	//读入所有样本的特征值
+//		for (j = 0; j<FEATURES_CNT; j++)
+//			fscanf(fpFeatures, "%lf", &sampleInput[i][j]);
+//	fclose(fpFeatures);
 //
-//	指向旋转图象的指针
-//	LPSTR lpNewDIB;
-//	LPSTR lpNewDIBBits;
-//
-//	指向BITMAPINFO结构的指针
-//	LPBITMAPINFOHEADER lpbmi;
-//
-//	指向BITMAPCOREINFO结构的指针
-//	LPBITMAPCOREHEADER lpbmc;
-//
-//	循环变量
-//	LONG i;
-//	LONG j;
-//
-//	像数在原DIB中的坐标
-//	FLOAT i0;
-//	FLOAT j0;
-//
-//	旋转角度
-//	float fRotateAngle;
-//
-//	旋转角度的正弦和余弦
-//	float fSina, fCosa;
-//
-//	原图四个角的坐标
-//	float fSrcX1, fSrcY1, fSrcX2, fSrcY2, fSrcX3, fSrcY3, fSrcX4, fSrcY4;
-//
-//	旋转后四个角的坐标
-//	float fDstX1, fDstY1, fDstX2, fDstY2, fDstX3, fDstY3, fDstX4, fDstY4;
-//
-//	两个中间常量
-//	float f1, f2;
-//
-//	找到原DIB图象像数起始位置
-//	lpDIBBits = ::FindDIBBits(lpDIB);
-//
-//	获取图象的宽度
-//	lWidth = ::DIBWidth(lpDIB);
-//
-//	获取图象的高度
-//	lHeight = ::DIBHeight(lpDIB);
-//
-//	将旋转角度从度转换到弧度
-//	fRotateAngle = (float)RADIAN(iRotateAngle);
-//
-//	计算旋转角度的正弦
-//	fSina = (float)sin((double)fRotateAngle);
-//
-//	计算旋转角度的余弦
-//	fCosa = (float)cos((double)fRotateAngle);
-//
-//	计算原图的四个角的坐标
-//	fSrcX1 = (float)(-(lWidth - 1) / 2);
-//	fSrcY1 = (float)((lHeight - 1) / 2);
-//	fSrcX2 = (float)((lWidth - 1) / 2);
-//	fSrcY2 = (float)((lHeight - 1) / 2);
-//	fSrcX3 = (float)(-(lWidth - 1) / 2);
-//	fSrcY3 = (float)(-(lHeight - 1) / 2);
-//	fSrcX4 = (float)((lWidth - 1) / 2);
-//	fSrcY4 = (float)(-(lHeight - 1) / 2);
-//
-//	计算新图四个角的坐标
-//	fDstX1 = fCosa*fSrcX1 + fSina*fSrcY1;
-//	fDstY1 = -fsina*fSrcX1 + fCosa*fSrcY1;
-//	fDstX2 = fCosa*fSrcX2 + fSina*fSrcY2;
-//	fDstY2 = -fsina*fSrcX2 + fCosa*fSrcY2;
-//	fDstX3 = fCosa*fSrcX3 + fSina*fSrcY3;
-//	fDstY3 = -fsina*fSrcX3 + fCosa*fSrcY3;
-//	fDstX4 = fCosa*fSrcX4 + fSina*fSrcY4;
-//	fDstY4 = -fsina*fSrcX4 + fCosa*fSrcY4;
-//
-//	计算旋转后的图象实际宽度
-//	lNewWidth = (LONG)(max(fabs(fDstX4 - fDstX1), fabs(fDstX3 - fDstX2)) + 0.5);
-//	lNewLineBytes = WIDTHBYTES(lNewWidth * 8);
-//
-//	计算旋转后图象的高度
-//	lNewHeight = (LONG)(max(fabs(fDstY4 - fDstY1), fabs(fDstY3 - fDstY2)) + 0.5);
-//
-//	两个常数，这样不用以后每次都计算
-//	f1 = (float)(-0.5*(lNewWidth - 1)*fCosa - 0.5*(lNewHeight - 1)*fSina + 0.5*(lWidth - 1));
-//	f2 = (float)(0.5*(lNewWidth - 1)*fSina - 0.5*(lNewHeight - 1)*fCosa + 0.5(lHeight - 1));
-//
-//	分配内存，以保存DIB
-//	hDIB = (hDIB)::GlobalAlloc(GHND, lNewLineBytes*lNewHeight + *(LPDWORD)lpDIB + ::paletteSize(lpDIB));
-//
-//	判断是否为内存分配失败
-//	if (hDIB == NULL)
-//	{
-//
-//		分配内存失败
-//		return NULL;
-//	}
-//
-//	锁定内存
-//	lpNewDIB = (char *)::GlobalLock((HGLOBAL)hDIB);
-//
-//	复制DIB信息头和调色板
-//	memcpy(lpNewDIB, lpDIB, *(LPDWORD)lpDIB + ::PaletteSize(lpDIB));
-//
-//	找到新DIB像数起始位置
-//	lpNewDIBBits = ::FindDIBBits(lpNewDIB);
-//
-//	获取指针
-//	lpbmi = (LPBITMAPINFOHEADER)lpNewDIB;
-//	lpbmc = (LPBITMAPCOREHEADER)lpNewDIB;
-//
-//	更新DIB中图象的高度和宽度
-//	if (IS_WIN30_DIB(lpNewDIB))
-//	{
-//
-//		对于WIN 3.0 DIB
-//		lpbim->biWidth = lNewWidth;
-//		lpbmi->biHeight = lNewHeight;
-//	}
-//	else
-//	{
-//		对于其他格式的DIB
-//		lpbmc->bcWidth = (unsigned short)lNewWidth;
-//		lpbmc->bcHeight = (unsigned short)lNewHeight;
-//	}
-//	针对图象每行进行操作
-//	for (i = 0;i<lNewHeight;i++)
-//	{
-//		针对图象每列进行操作
-//		for (j = 0;j<lNewWidth;j++)
-//		{
-//			注意新DIB第i行,第j列个像数的指针
-//			注意此处宽度和高度是DIB的宽度和高度
-//			lpDst = (char *)lpNewDIBBits + lNewLineBytes*(lNewHeight - 1 - i) + j;
-//
-//			计算该像数在原DIB中的坐标
-//			i0 = -((float)j)*fSina + ((float)i)*fCosa + f2;
-//			j0 = ((float)j)*fCosa + ((float)i)*fSina + f1;
-//
-//			利用双线形插值算法来估算像数值
-//			*lpDst = Interpolation(lpDIBBits, lWidth, lHeight, j0, i0);
-//
+//	if (mode == TRAIN_MODE) { //训练模式
+//		fpCarNum = openTextFile(CAR_NUM_PATH, "r");
+//		//for(i=0;i<SAMPLE_CNT;i++)	//读入所有样本的特征值
+//		//	for(j=0; j<FEATURES_CNT; j++)
+//		//		sampleOutput[i][j] = 0;
+//		for (i = 0;i<SAMPLE_CNT;i++) {	//读入所有样本的实际值对应的编号
+//			fscanf(fpCarNum, "%d", &realNumIndex[i]);
+//			sampleOutput[i][realNumIndex[i]] = 1;
 //		}
+//		fclose(fpCarNum);
 //	}
-//
-//	返回
-//	return hDIB;
-//
-//}
-//
-///*************************************************************************
-//* 函数名称：
-//*   Interpolation()
-//* 参数:
-//*   LPSTR lpDIBBits    - 指向源DIB图像指针
-//*   LONG  lWidth       - 源图像宽度（象素数）
-//*   LONG  lHeight      - 源图像高度（象素数）
-//*   FLOAT x            - 插值元素的x坐标
-//*   FLOAT y            - 插值元素的y坐标
-//* 返回值:
-//*   unsigned char      - 返回插值计算结果。
-//* 说明:
-//*   该函数利用双线性插值算法来估算象素值。对于超出图像范围的象素，
-//* 直接返回255。
-//************************************************************************/
-//unsigned char CDibImage::Interpolation(LPSTR lpDIBBits, LONG lWidth,
-//	LONG lHeight, FLOAT x, FLOAT y)
-//{
-//	 四个最临近象素的坐标(i1, j1), (i2, j1), (i1, j2), (i2, j2)  
-//	LONG    i1, i2;
-//	LONG    j1, j2;
-//
-//	unsigned char    f1, f2, f3, f4;    // 四个最临近象素值      
-//	unsigned char    f12, f34;        // 二个插值中间值      
-//
-//									   定义一个值，当象素坐标相差小于改值时认为坐标相同  
-//	FLOAT            EXP;
-//
-//	LONG lLineBytes;                // 图像每行的字节数  
-//	lLineBytes = WIDTHBYTES(lWidth * 8);
-//
-//	EXP = (FLOAT) 0.0001;
-//
-//	 计算四个最临近象素的坐标  
-//	i1 = (LONG)x;
-//	i2 = i1 + 1;
-//	j1 = (LONG)y;
-//	j2 = j1 + 1;
-//
-//	 根据不同情况分别处理  
-//	if ((x < 0) || (x > lWidth - 1) || (y < 0) || (y > lHeight - 1))
-//	{
-//		return 255;        // 要计算的点不在源图范围内，直接返回255。  
-//	}
-//	else
-//	{
-//		if (fabs(x - lWidth + 1) <= EXP)
-//		{
-//			 要计算的点在图像右边缘上  
-//			if (fabs(y - lHeight + 1) <= EXP)
-//			{
-//				 要计算的点正好是图像最右下角那一个象素，直接返回该点象素值  
-//				f1 = *((unsigned char *)lpDIBBits + lLineBytes *
-//					(lHeight - 1 - j1) + i1);
-//				return f1;
-//			}
-//			else
-//			{
-//				 在图像右边缘上且不是最后一点，直接一次插值即可  
-//				f1 = *((unsigned char *)lpDIBBits + lLineBytes *
-//					(lHeight - 1 - j1) + i1);
-//				f3 = *((unsigned char *)lpDIBBits + lLineBytes *
-//					(lHeight - 1 - j1) + i2);
-//
-//				 返回插值结果  
-//				return ((unsigned char)(f1 + (y - j1) * (f3 - f1)));
+//	else if (mode == TEST_MODE) {
+//		//权重
+//		fpWeight = openTextFile(WEIGHT_PATH, "r");
+//		for (i = 0; i < NEURON_CNT; ++i) {
+//			for (j = 0; j < FEATURES_CNT; ++j) {
+//				fscanf(fpWeight, "%lf", &temp);
+//				inputLayerWeight[i][j] = temp;
 //			}
 //		}
-//		else if (fabs(y - lHeight + 1) <= EXP)
-//		{
-//			 要计算的点在图像下边缘上且不是最后一点，直接一次插值即可  
-//			f1 = *((unsigned char*)lpDIBBits + lLineBytes * (lHeight - 1 - j1) + i1);
-//			f2 = *((unsigned char*)lpDIBBits + lLineBytes * (lHeight - 1 - j2) + i1);
 //
-//			 返回插值结果  
-//			return ((unsigned char)(f1 + (x - i1) * (f2 - f1)));
-//		}
-//		else
-//		{
-//			 计算四个最临近象素值  
-//			f1 = *((unsigned char*)lpDIBBits + lLineBytes * (lHeight - 1 - j1) + i1);
-//			f2 = *((unsigned char*)lpDIBBits + lLineBytes * (lHeight - 1 - j2) + i1);
-//			f3 = *((unsigned char*)lpDIBBits + lLineBytes * (lHeight - 1 - j1) + i2);
-//			f4 = *((unsigned char*)lpDIBBits + lLineBytes * (lHeight - 1 - j2) + i2);
-//
-//			 插值1  
-//			f12 = (unsigned char)(f1 + (x - i1) * (f2 - f1));
-//			 插值2  
-//			f34 = (unsigned char)(f3 + (x - i1) * (f4 - f3));
-//			 插值3  
-//			return ((unsigned char)(f12 + (y - j1) * (f34 - f12)));
+//		for (i = 0; i < NEURON_CNT; ++i) {
+//			for (j = 0; j < OUTPUT_CNT; ++j) {
+//				fscanf(fpWeight, "%lf", &temp);
+//				outputLayerWeight[j][i] = temp;
+//			}
 //		}
 //	}
 //}
+//
+////初始化神经网络，包括输入层特征值的归一化和权重的随机初始化
+//void initBPNework(int mode) {
+//	int i, j;
+//	for (i = 0; i<FEATURES_CNT; i++) {
+//		minIn[i] = maxIn[i] = sampleInput[0][i];
+//		for (j = 0; j<SAMPLE_CNT; j++)
+//		{
+//			maxIn[i] = maxIn[i]>sampleInput[j][i] ? maxIn[i] : sampleInput[j][i];
+//			minIn[i] = minIn[i]<sampleInput[j][i] ? minIn[i] : sampleInput[j][i];
+//		}
+//	}
+//	// 归一化处理
+//	for (i = 0; i < FEATURES_CNT; i++)
+//		for (j = 0; j < SAMPLE_CNT; j++)
+//			sampleInput[j][i] = (sampleInput[j][i] - minIn[i] + 1) / (maxIn[i] - minIn[i] + 1);
+//
+//	/*for(i = 0; i < SAMPLE_CNT; i++)
+//	sampleOutput[i] /= OUTPUT_CNT;*/
+//
+//	if (mode == TRAIN_MODE) {
+//		//权重随机初始化
+//		for (i = 0; i < NEURON_CNT; ++i) {
+//			for (j = 0; j < FEATURES_CNT; ++j) {
+//				inputLayerWeight[i][j] = (rand()*2.0 / RAND_MAX - 1) / 2;
+//				inputLayerWeightDiff[i][j] = 0;
+//			}
+//		}
+//
+//		for (i = 0; i < NEURON_CNT; ++i) {
+//			for (j = 0; j < OUTPUT_CNT; ++j) {
+//				outputLayerWeight[j][i] = (rand()*2.0 / RAND_MAX - 1) / 2;
+//				outputLayerWeightDiff[j][i] = 0;
+//			}
+//		}
+//	}
+//
+//}
+//
+//void computO(int var) {
+//	int i, j;
+//	double sum;
+//	//输入层到隐含层的输出   
+//	for (i = 0; i < NEURON_CNT; ++i) {
+//		sum = 0;
+//		for (j = 0; j < FEATURES_CNT; ++j)
+//			sum += inputLayerWeight[i][j] * sampleInput[var][j];
+//		activationValue[i] = 1 / (1 + exp(-1 * sum));
+//	}
+//	/*  隐藏层到输出层输出 */
+//	for (i = 0; i < OUTPUT_CNT; ++i) {
+//		sum = 0;
+//		for (j = 0; j < NEURON_CNT; ++j)
+//			sum += outputLayerWeight[i][j] * activationValue[j];
+//
+//		networkOutput[i] = sum;
+//	}
+//	printArrDbe(networkOutput, OUTPUT_CNT);
+//}
+//
+//void backUpdate(int var)
+//{
+//	int i, j;
+//	double t;
+//	for (i = 0; i < NEURON_CNT; ++i)
+//	{
+//		t = 0;
+//		for (j = 0; j < OUTPUT_CNT; ++j) {
+//			t += (networkOutput[j] - sampleOutput[var][j])*outputLayerWeight[j][i];
+//
+//			outputLayerWeightDiff[j][i] = A*outputLayerWeightDiff[j][i] + B*(networkOutput[j] - sampleOutput[var][j])*activationValue[i];
+//			outputLayerWeight[j][i] -= outputLayerWeightDiff[j][i];
+//		}
+//
+//		for (j = 0; j < FEATURES_CNT; ++j) {
+//			inputLayerWeightDiff[i][j] = a*inputLayerWeightDiff[i][j] + b*t*activationValue[i] * (1 - activationValue[i])*sampleInput[var][j];
+//			inputLayerWeight[i][j] -= inputLayerWeightDiff[i][j];
+//		}
+//	}
+//}
+//
+//void writeNeuron()
+//{
+//	FILE *fpNeuron;
+//	int i, j;
+//	fpNeuron = openTextFile(WEIGHT_PATH, "w");
+//	for (i = 0; i < NEURON_CNT; ++i)
+//		for (j = 0; j < FEATURES_CNT; ++j)
+//			fprintf(fpNeuron, "%lf ", inputLayerWeight[i][j]);
+//
+//	fprintf(fpNeuron, "\n\n\n\n");
+//
+//	for (i = 0; i < NEURON_CNT; ++i)
+//		for (j = 0; j < OUTPUT_CNT; ++j)
+//			fprintf(fpNeuron, "%lf ", outputLayerWeight[j][i]);
+//
+//	fclose(fpNeuron);
+//}
+//
+//void  trainNetwork() {
+//	int i, c = 0;
+//	do {
+//		e = 0;
+//		for (i = 0; i < SAMPLE_CNT; ++i) {
+//			computO(i);
+//			//for (j = 0; j < OUTPUT_CNT; ++j)
+//			e += fabs(networkOutput[realNumIndex[i]] - sampleOutput[i][realNumIndex[i]]);
+//			backUpdate(i);
+//		}
+//		printf("%d  %lf\n", c, e / SAMPLE_CNT);
+//		c++;
+//	} while (c<TRAIN_CNT && e / SAMPLE_CNT>0.01);
+//	printArrDbe(networkOutput, FEATURES_CNT);
+//}
+//
+////void  trainNetworkMain()
+////{
+////	int mode = 1, i;
+////	readData(TRAIN_FEATRUES_PATH, mode);
+////	initBPNework(mode);
+////	if (mode == TRAIN_MODE) {
+////		trainNetwork();
+////		writeNeuron();
+////	}
+////	else if (mode == TEST_MODE) {
+////		for (i = 0; i<SAMPLE_CNT; ++i) {
+////			computO(i);
+////			printf("%d \n", getExtremumIndex(networkOutput, OUTPUT_CNT, 1));
+////		}
+////	}
+////}
+//
+//

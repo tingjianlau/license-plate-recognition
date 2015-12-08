@@ -18,8 +18,12 @@ typedef	struct bounds
 	LONG	left;
 	LONG	right;
 }BOUNDS, *PBOUNDS;
+BYTE*		splitPL(const BYTE* imageArr, LONG width, LONG height, int* status);
+BYTE*		splitChar(const BYTE* imageArr, LONG width, LONG height, LONG upBound, LONG downBound, const LONG partition[]);
+BYTE*		normalized(const BYTE* imageArr, LONG width, LONG height, PBOUNDS charBound);
 //LONG*	myRadon(BYTE *imageArr8, int *thetaPtr, LONG width, LONG height, int numAngles);
-
+int	getHorBound_split(const BYTE* imageArr, LONG width, LONG height, LONG upBound, LONG downBound, LONG partition[]);
+int	getVerBound_split(const BYTE* imageArr, LONG width, LONG height, LONG* upBound, LONG* downBound);
 int		judgePLClr(const PHSV myHSV, LONG width, LONG height);
 int		judgePixClr(double H, double S, double V);
 BYTE*	binarization_PLClr(BYTE* imageArr24, LONG width, LONG height, PHSV myHSV, int PLClr);
@@ -50,11 +54,12 @@ BYTE	*PLProBmpArr8;  // 车牌底色边缘点
 HSV*	myHSV = NULL;
 
 char*		dest;
-int		locatePL_clr(char* srcFile, char* destFile) {
+//int		locatePL_clr(char* srcFile, char* destFile) {
+BYTE*	locatePL_clr(char* srcFile, char* destFile, int* status) {
 	FILE	*fpSrc = NULL, *fpDest = NULL;
-	LONG	i, j, k, temp = 0;
-	BYTE	*bmpArr8, *bmpArr24, *firstLocateBmpArr, *secLocateBmpArr, *tempArr, *rotateBmpArr;
-	int		res, status = 0;
+	LONG	i, j, temp = 0;
+	BYTE	*bmpArr24, *firstLocateBmpArr, *secLocateBmpArr, *tempArr=NULL, *rotateBmpArr, *resArr = NULL;
+	int		res;
 	int		iRotateAngle = 0;
 	LONG	origWidth, origHeight, locateWidth, locateHeight, rotateWidth, rotateHeight
 		, cWidth=0, cHeight=0;
@@ -62,11 +67,11 @@ int		locatePL_clr(char* srcFile, char* destFile) {
 	const WORD	wTpye = BF_TYPE_24;		//指定提取的对象是8位灰度还是24位真色子图		
 	BOUNDS	bound;			// 四个边界，分别代表上下左右
 	int		PLClr = 0;
-
+	
+	*status = LOCATE_FAIL;
 	dest = destFile;
-
+	
 	fpSrc = loadImage(srcFile, &bmpImage);
-	//printBmpHeader(&bmpImage);
 	bmpArr24 = creatImageArr(fpSrc, &bmpImage);
 	origWidth = bmpImage.infoHeader.biWidth;
 	origHeight = bmpImage.infoHeader.biHeight;
@@ -75,10 +80,10 @@ int		locatePL_clr(char* srcFile, char* destFile) {
 		res = firstLocatePL(bmpArr24, origWidth, origHeight, &bound, PLClr);
 		if (res == 0)
 		{	// 第一次定位成功
-			status = 1;
+			*status = FIRST_LOCATE_SECC;
 			break;
 		}
-		if (res != 0)
+		else 
 		{	// 第一次定位失败
 			bound.up = -1;		// 初始边界，避免第一次定位失败对第二次定位的影响
 			bound.down = -1;
@@ -88,53 +93,402 @@ int		locatePL_clr(char* srcFile, char* destFile) {
 			//creatBmpByArr(destFile, &bmpImage, PLProEdgeBmpArr8, 8);
 			if (res == 0)
 			{ // 第二次定位成功
-				status = 2;
+				*status = SEC_LOCATE_SECC;
 				break;
 			}
 		}
 	}
 	printf("车牌颜色为: %d \n", PLClr);
-	//printf("%d \n", PLProEdgeBmpArr8[0]);
-	//bmpArr8 = binarization_PLClr(bmpArr24, origWidht, origHeight, myHSV, 0);
-	//medianFilter(bmpArr8, origWidht, origHeight);
 	
-	//getHorBound_Clr(bmpArr8,origWidht, origHeight, bound);
-	//getVerBound(bmpArr8, origWidht, origHeight, bound);
-	//drawBound(bmpArr8, origWidht, origHeight, bound);
-	
-//	printf("%d \n", PLClr);
 	if (res == 0)
 	{  // 定位成功
-		status = 1;
 		tempArr = extractBmpByBounds(bmpArr24, origWidth, origHeight, &bound, 24);
 		locateWidth = bound.right - bound.left + 1;
 		locateHeight = bound.up - bound.down + 1;
+		
 		//tempArr = extractBmpByBounds(PLProBmpArr8, origWidth, origHeight, &bound, 8);
 		
-		//dilation(tempArr, locateWidth, locateHeight);
-		//sobleSideEnhance(tempArr, locateWidth, locateHeight, 0);
-		//iRotateAngle = hough(tempArr, locateWidth, locateHeight);
-	//	printf("%d \n", iRotateAngle);
-		//rotateBmpArr = rotateRGB(tempArr, 0, locateWidth, locateHeight, &rotateWidth, &rotateHeight);
 		rotateBmpArr = correction(tempArr, locateWidth, locateHeight, &cWidth, &cHeight);
-
-		/*bmpImage.infoHeader.biWidth = locateWidth;
-		bmpImage.infoHeader.biHeight = locateHeight;*/
+		free(tempArr);
+		//if (PLClr == 1 || PLClr == 2)
+		//{	// 如果是黄色或白色底的车牌，则需要反转二值图
+		//	reverseBinImg(tempArr, locateWidth, locateHeight);
+		//}
 		bmpImage.infoHeader.biWidth = cWidth;
 		bmpImage.infoHeader.biHeight = cHeight;
-		//printf("%d %d \n", cWidth, cHeight);
 		creatBmpByArr(destFile, &bmpImage, rotateBmpArr, 8);
-		free(tempArr);
-		//free(rotateBmpArr);
+		// 切割字符，归一化并细化
+		tempArr = splitPL(rotateBmpArr, cWidth, cHeight, &res);
+		free(rotateBmpArr);
+		if (res == 0)//切割成功
+		{
+			*status = (*status == FIRST_LOCATE_SECC) ? FIRST_LOCATE_SPLIT_SECC : SEC_LOCATE_SPLIT_SECC; //更新成功标识
+			resArr = tempArr;
+			/*for (i = 6 * NORMALIZED_WIDTH*NORMALIZED_HEIGHT*sizeof(BYTE)+500; i < 6 * NORMALIZED_WIDTH*NORMALIZED_HEIGHT*sizeof(BYTE) + 600; i++)
+			{
+				printf("%d ", resArr[i]);
+			}*/
+			tempArr += NORMALIZED_WIDTH*NORMALIZED_HEIGHT;
+			/*bmpImage.infoHeader.biWidth = NORMALIZED_WIDTH;
+			bmpImage.infoHeader.biHeight = NORMALIZED_HEIGHT;
+			creatBmpByArr(destFile, &bmpImage, tempArr, 8);*/
+		}
+		else
+		{
+			//printf("字符切割失败\n");
+			*status = (*status == FIRST_LOCATE_SECC) ? FIRST_LOCATE_SPLIT_FAIL : SEC_LOCATE_SPLIT_FAIL; //更新成功标识
+		}
 	}
 	
 	free(PLProEdgeBmpArr8);
 	free(PLProBmpArr8);
 	free(charProBmpArr8);
 	free(myHSV);
-	return status;
+	return resArr;
 }
 
+// 切割字符，归一化并细化
+BYTE*		splitPL(const BYTE* imageArr, LONG width, LONG height, int* status) {
+	LONG	partition[14] = { 0 };
+	LONG	upBound = 0, downBound = 0;
+	BYTE*	tempArr;
+
+	*status = 0;
+	//切割字符
+	if (getVerBound_split(imageArr, width, height, &upBound, &downBound) == -1)
+	{
+		*status = 1;	// 水平切割字符失败
+	}
+	else
+	{
+		if (getHorBound_split(imageArr, width, height, upBound, downBound, partition) == 1) {
+			/*for (i = 0; i < width; i++)
+			{
+			imageArr[upBound*width + i] = 255;
+			imageArr[downBound*width + i] = 255;
+			}
+			for (i = 0; i < 14; i++)
+			{
+			for (j = 0; j < height; j++)
+			{
+			imageArr[j*width + partition[i]] = 255;
+			}
+			}*/
+			tempArr = splitChar(imageArr, width, height, upBound, downBound, partition);
+			
+		}
+		else
+		{
+			*status = 2;	// 垂直切割字符失败
+
+		}
+	}		//切割成功
+	return tempArr;
+}
+//切割字符前，用于获取精确的车票上下界
+int	getVerBound_split(const BYTE* imageArr, LONG width, LONG height, LONG* upBound, LONG* downBound) {
+	BYTE	cur_cls, pre_clr=-1;
+	LONG	i, j;
+	int		*aHorDiff, *cnt, *maxCnt; // 水平扫描后，每行邻接点相异的个数
+	aHorDiff = (int*)calloc(height, sizeof(int));
+	cnt = (int*)calloc(height, sizeof(int));
+	maxCnt = (int*)calloc(height, sizeof(int));
+
+	for ( i = 0; i < height; i++)
+	{
+		for ( j = 0; j < width; j++)
+		{
+			cur_cls = imageArr[i*width + j];
+			if (cur_cls != pre_clr)
+			{
+				aHorDiff[i]++;
+			}
+			if (cur_cls == 0)
+			{
+				cnt[i]++;
+			}
+			else
+			{
+				if (cnt[i] > maxCnt[i])
+				{
+					maxCnt[i] = cnt[i]; // 每行连续黑点最多的个数
+					cnt[i] = 0;
+				}
+			}
+			pre_clr = cur_cls;
+		}
+
+		//printf("%d ", maxCnt[i]);
+	}
+	//求下边界
+	for ( i = 0; i < height; i++)
+	{
+		//if (aHorDiff[i] > CELL_THRESHOLD_DIFF && maxCnt[i] < width / 4)
+		if (aHorDiff[i] > CELL_THRESHOLD_DIFF)
+		{
+			*downBound = i + 1;
+			break;
+		}
+	}
+	// 求上边界
+	for ( i = height-1; i >= 0; i--)
+	{
+		//if (aHorDiff[i] > CELL_THRESHOLD_DIFF && maxCnt[i] < width / 4)
+		if (aHorDiff[i] > CELL_THRESHOLD_DIFF)
+		{
+			*upBound = i - 1;
+			break;
+		}
+	}
+	if (*downBound+5 >= *upBound)
+	{
+		return -1;	// 车票的最小高度小于5，失败
+	}
+
+	free(aHorDiff);
+	return 1;
+}
+//切割字符前，用于获取精确的车牌每个字符的左右边界
+int	getHorBound_split(const BYTE* imageArr, LONG width, LONG height, LONG upBound, LONG downBound, LONG partition[]) {
+	LONG	i, j;
+	int		k=0,g=0, isPLFrame=0, isDot=0;//属于第一个字符的波峰的起点及存在点字符
+	BYTE	cur_cls;
+	int		*aVerWhites = (int*)calloc(width, sizeof(int));
+	int		unitCnt = 0;		// 总共的投影波峰的个数
+	int		dotCnt = 0;			// 疑似车牌前两字符后的点所在矩形区域的白点数目
+	int		*flag;				// 用来标识波峰是否为字符区域
+	int		flagCnt = 0;
+	struct MyVerPro
+	{
+		LONG	start;		// 单个投影区域的起点
+		LONG	end;		// 单个投影区域的终点
+		LONG	wid;		// 投影区域的宽度
+		LONG	cnt;		// 投影去白点数量
+	};
+	struct MyVerPro* sdVerPro;
+	////printf("%d %d", downBound, upBound);
+	// 统计垂直投影个数
+	for ( i = downBound; i <= upBound; i++)
+	{
+		for ( j = 0; j < width; j++)
+		{
+			if (imageArr[i*width+j] == 255)
+			{
+				aVerWhites[j]++;
+			}
+		}
+	}
+	for ( i = 0; i < width; i++)
+	{
+		if (aVerWhites[i] < 2)
+		{
+			aVerWhites[i] = 0;
+		}
+	}
+	// 计算波峰的个数
+	for ( i = 1; i < width-1; i++)
+	{
+		if (aVerWhites[i]!=0 && aVerWhites[i] - aVerWhites[i-1] == aVerWhites[i])
+		{
+			unitCnt++;
+			//printf("%d ", i);
+		}
+	}
+	if (aVerWhites[0] != 0)
+	{
+		unitCnt++;
+	}
+	//printf("%d nn\n", unitCnt);
+	if (unitCnt < 7) //  波峰区域少于7个，不是标准车牌
+	{
+		//printf("波峰区域少于7个 %d \n", unitCnt);
+		return -1;
+	}
+	sdVerPro = (struct MyVerPro*)malloc(unitCnt*sizeof(struct MyVerPro));
+	flag = (int*)calloc(unitCnt, sizeof(int));
+	flagCnt = unitCnt;
+	
+	// 分析投影
+	if (aVerWhites[0] != 0)
+	{
+		sdVerPro[k++].start = 0;
+	}
+	for (i = 1; i < width-1; i++)
+	{
+		if (aVerWhites[i] != 0 && aVerWhites[i] - aVerWhites[i - 1] == aVerWhites[i])
+		{
+			sdVerPro[k++].start = i;
+			//printf("start %d %d ", k-1, sdVerPro[k - 1].start);
+		}
+		if (aVerWhites[i] != 0 && aVerWhites[i] - aVerWhites[i + 1] == aVerWhites[i])
+		{
+			sdVerPro[g++].end = i;
+		}
+	}
+	if (g<k)
+	{
+		sdVerPro[g++].end = width-1;
+	}
+	//// 计算每个波峰中的白色点的个数
+	//for ( i = 0; i < unitCnt; i++)
+	//{
+
+	//}
+	// 计算每个波峰的宽度和白色点的个数
+	/*for (i = 0; i < unitCnt; i++)
+	{
+		printf("start %d %d ",i,  sdVerPro[i].start);
+		printf("end %d %d ", i, sdVerPro[i].end);
+	}*/
+	for ( i = 0; i < unitCnt; i++)
+	{
+		sdVerPro[i].wid = sdVerPro[i].end - sdVerPro[i].start + 1;
+		sdVerPro[i].cnt = 0;
+		for ( j = sdVerPro[i].start; j <= sdVerPro[i].end; j++)
+		{
+			sdVerPro[i].cnt += aVerWhites[j];
+		}
+	}
+
+	if (sdVerPro[0].wid<6 || sdVerPro[0].wid<sdVerPro[1].wid/2)
+	{
+		//isPLFrame = 1;		// 第一个波峰属于边框的波峰，移除
+		flag[0] = 1;	// 第一个波峰属于边框的波峰，移除
+		
+		flagCnt--;
+	}
+	// 计算疑似车票中的点字符的白点数目
+	/*for (i = downBound; i <= upBound; i++)
+	{
+		for (j = sdVerPro[2 + isPLFrame].start; j <= sdVerPro[2 + isPLFrame].end; j++)
+		{
+			if (imageArr[i*width+j] == 255)
+			{
+				dotCnt++;
+			}
+		}
+	}*/
+	//dotCnt = sdVerPro[2 + isPLFrame].cnt;
+	for ( i = 1; i < unitCnt; i++)
+	{
+		if ((sdVerPro[i].wid<6)&& sdVerPro[i].cnt<sdVerPro[i].wid*(upBound-downBound+1) / 4) // 排除字符1的干扰
+		{
+			flag[i] = 1;		// 该波峰区域不是字符所在
+			flagCnt--;
+			
+		}
+	}
+	//if ((sdVerPro[2 + isPLFrame].wid<6 || sdVerPro[2 + isPLFrame].wid<sdVerPro[0 + isPLFrame].wid / 2)
+	//	&& dotCnt<sdVerPro[2 + isPLFrame].wid*height/4) // 排除字符1的干扰
+	//{
+	//	isDot = 1;		// 存在点字符
+	//}
+	
+	if (flagCnt < 7) //  波峰区域少于7个，不是标准车牌
+	{
+		//printf("波峰区域少于7个 %d \n", flagCnt);
+		return -1;
+	}
+	/*for ( i = 0; i < 7; i++)
+	{
+		if (i<2)
+		{
+			partition[2 * i] = sdVerPro[i + isPLFrame].start - 1;
+			partition[2 * i + 1] = sdVerPro[i + isPLFrame].end + 1;
+		}
+		else
+		{
+			partition[2 * i] = sdVerPro[i + isPLFrame + isDot].start - 1;
+			partition[2 * i + 1] = sdVerPro[i + isPLFrame + isDot].end + 1;
+		}
+		
+	}*/
+	for (i = 0, k=0; i < unitCnt && k < 7; i++)
+	{
+		if (flag[i] == 0)
+		{
+			partition[2 * k] = sdVerPro[i].start - 1;
+			partition[2 * k+1] = sdVerPro[i].end + 1;
+			k++;
+		}
+	}
+	partition[0] = (partition[0] < 0) ? 0 : partition[0];
+	partition[13] = (partition[13] > width-1) ? width-1 : partition[13];
+
+	return 1;
+}
+//切割字符，归一化后返回。用一个一维数组模拟三维数组，表示归一化后的七个字符数组
+BYTE*		normalized(const BYTE* imageArr, LONG width, LONG height, PBOUNDS charBound){
+	BYTE	cur_cls;
+	BYTE*	tempArr;
+	LONG	i, j, charWidth, charHeight;
+	double xZoomRatio = 0.0;	// 横坐标缩放比例
+	double yZoomRatio = 0.0;	// 纵坐标缩放比例
+	double x = 0.0;			// 转换后原图的横坐标
+	double y = 0.0;			// 转换后原图的纵坐标
+	double m = 0.0;			// 横坐标的小数部分
+	double n = 0.0;			// 纵坐标的小数部分
+	BYTE	rd, ld, lu, ru;	//
+	LONG		iX, iY;
+
+	charWidth = charBound->right - charBound->left + 1;
+	charHeight = charBound->up - charBound->down + 1;
+	xZoomRatio = (double)NORMALIZED_WIDTH / charWidth;
+	yZoomRatio = (double)NORMALIZED_HEIGHT / charHeight;
+	tempArr = (BYTE*)calloc(NORMALIZED_WIDTH*NORMALIZED_HEIGHT, sizeof(BYTE));
+
+	for ( i = 0; i < NORMALIZED_HEIGHT; i++)
+	{
+		for ( j = 0; j < NORMALIZED_WIDTH; j++)
+		{
+			x = (double)j / xZoomRatio;
+			y = (double)i / yZoomRatio;
+			m = getDecimalPart(x);
+			n = getDecimalPart(y);
+
+			iX = (LONG)(x - m) + charBound->left;
+			iY = (LONG)(y - n) + charBound->down;
+
+			//左下角的坐标的像素值
+			ld = imageArr[iY*width + iX];
+			//右下角的像素
+			rd = (iX == width - 1) ? 0 : imageArr[iY*width + iX + 1];
+			//左上角的坐标的像素值
+			lu = (iY == height - 1) ? 0 : imageArr[(iY+1)*width + iX];
+			//右下角的像素
+			ru = (iX == width - 1 || iY == height - 1) ? 0 : imageArr[(iY + 1)*width + iX + 1];
+			
+			// 双线性插值后得到的像素值
+			cur_cls = (BYTE)((1 - m)*(1 - n)*ld + (1 - m)*n*lu + m*n*ru + m*(1 - n)*rd);
+			tempArr[i*NORMALIZED_WIDTH + j] = (cur_cls > BI_THRESHOLD) ? 255 : 0;
+		}
+	}
+
+	return tempArr;
+}
+
+BYTE*		splitChar(const BYTE* imageArr, LONG width, LONG height, LONG upBound, LONG downBound, const LONG partition[]) {
+	BOUNDS charBound;
+	LONG	i, j;
+	BYTE*	tempArr;
+	
+	LONG	lTmp = NORMALIZED_WIDTH*NORMALIZED_HEIGHT*sizeof(BYTE);
+	BYTE*	resArr = (BYTE*)calloc(7 * lTmp, sizeof(BYTE));
+	BYTE*	resTmp = resArr;
+	charBound.down = downBound;
+	charBound.up = upBound;
+	for ( i = 0; i < 7; i++)
+	{
+		charBound.left = partition[2 * i];
+		charBound.right = partition[2 * i + 1];
+		tempArr = normalized(imageArr, width, height, &charBound);
+		thinnerRosenfeld(tempArr, NORMALIZED_WIDTH, NORMALIZED_HEIGHT);
+		memcpy((BYTE*)resArr, (BYTE*)tempArr, lTmp);
+		resArr += lTmp;
+	}
+
+	return resTmp;
+}
 BYTE*	correction(BYTE* imageArr24, LONG width, LONG height, LONG* cWidth, LONG* cHeight) {
 	BYTE* rotateBmpArr, *tempArr, *tempArr2;
 	LONG	xOrigin, yOrigin, rFirst, rSize, i, j;
@@ -1561,4 +1915,6 @@ BYTE	interpolation(const BYTE* imageArr8, LONG width, LONG height, double x, dou
 	}
 	return (res > 120) ? 255 : 0;
 }
+
+
 

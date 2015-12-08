@@ -53,5 +53,11 @@
     <ClCompile Include="locatePL_Clr.c">
       <Filter>源文件</Filter>
     </ClCompile>
+    <ClCompile Include="trainNetwork.c">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="featuresExtract.c">
+      <Filter>源文件</Filter>
+    </ClCompile>
   </ItemGroup>
 </Project>

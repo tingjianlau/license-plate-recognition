@@ -8,10 +8,11 @@
 #include	"preprocess.h"
 #include	"utils.h"
 
-#define ROOT_PATH "F:\\deep learning\\LPR\\"
+#define ROOT_PATH "E:\\Deep Learning\\LPR\\LPR\\"
 #define IMAGE_LIST_FILE "image list.txt"
 #define	LOCATION_RES_FILE "location results.txt"
-#define SOURCE_FOLDER	"test\\"
+#define	FEATURES_FILE "features.txt"
+#define	WIGHT_FILE "neuron.txt"
 #define RGB_TO_GRAY_FOLDER "rgbToGray\\"
 #define MEDIAA_FILTER_FOLDER "medianFilter\\"
 #define SIDE_ENHANCE_FOLDER "sobleSideEnhance\\"
@@ -22,15 +23,23 @@
 #define BLUE_PRO "蓝色前景图\\"
 #define WHITE_PRO "白色前景图\\"
 
-#define TEMP "temp\\1\\"
+#define TEMP "locatePL_Clr\\"
+#define SOURCE_FOLDER	"source\\"
 
 #define PATH_MAX	100
 
-void goGoGo(char* src, int begin, int end);		//实验图片的张数
+void preTrain(char* src, int begin, int end);		//实验图片的张数
 char*	statusInfo(int status);
 
 
+char	features[PATH_MAX] = { 0 };
+char	weightSrc[PATH_MAX] = { 0 };
+int		succPLCnt = 0;	// 成功提取特征的车牌的数量
 int main(){
+	// 神经网络训练之前的工作：包括车牌的定位，切割，归一化，细化及特征提取
+	preTrain(TEMP, 1, 100);
+
+	trainNetworkMain(features, weightSrc, 6* succPLCnt);
 	//FILE* fp;
 	//BYTE* tempArr, *rotateArr;
 	//BITMAP_IMAGE bmpImage;
@@ -119,12 +128,13 @@ int main(){
 	free(rotateArr);*/
 	//printf("\n %d ", getMaxIndex(maxArr, numAngles));
 	
-	goGoGo(TEMP, 1, 32);
+	
 	
 	return 0;
 }
 
-void goGoGo(char* src, int begin, int end){
+void preTrain(char* src, int begin, int end){
+	FILE* fpFeatures;
 	int		i=0;
 	char	temp1[PATH_MAX]= {0};
 	char	temp2[PATH_MAX]= {0};
@@ -134,20 +144,27 @@ void goGoGo(char* src, int begin, int end){
 	char	dest[PATH_MAX] = {0};
 	char	locateRes[PATH_MAX] = { 0 };
 	FILE*	fpImgList, *pfRes;
-	int		cnt = 0, realCnt = 0, status, cntLocFail=0, cntLocSuc1=0, cntLocSuc2=0;
+	int		cnt = 0, realCnt = 0, status=0, cntLocFail=0, cntLocSuc=0, cntLocSuc2=0;
+	BYTE    *thinnerImg = NULL;
 
 	strcat(locateRes, ROOT_PATH);
 	strcat(imageListSrc, ROOT_PATH);
 	strcat(source, ROOT_PATH);
 	strcat(dest, ROOT_PATH);
-
+	strcat(features, ROOT_PATH);
+	strcat(weightSrc, ROOT_PATH);
+	
 	strcat(locateRes, LOCATION_RES_FILE);
 	strcat(imageListSrc, IMAGE_LIST_FILE);
 	strcat(source, SOURCE_FOLDER);
+	strcat(features, FEATURES_FILE);
+	strcat(weightSrc, WIGHT_FILE);
 	strcat(dest, src);					// 修改此处，改变目标文件的存储位置
 
 	strcpy(temp1, source);
 	strcpy(temp2, dest);
+	// 提取特征并写入文本中
+	fpFeatures = openTextFile(features, "w");
 	if ((fpImgList = fopen(imageListSrc, "r"))!=NULL){
 		
 
@@ -163,21 +180,24 @@ void goGoGo(char* src, int begin, int end){
 				strcat(source, imageFname);
 				strcat(dest, imageFname);
 				//locatePL(source, dest);
-				status = locatePL_clr(source, dest);
-				if (status == 0)
+				
+				// 车牌定位，分割，归一化，细化
+				thinnerImg = locatePL_clr(source, dest, &status);
+				
+
+				if (status == LOCATE_FAIL || status == FIRST_LOCATE_SPLIT_FAIL || status == SEC_LOCATE_SPLIT_FAIL)
 				{
 					cntLocFail++;
 				}
-				else if (status == 1)
+				else if (status == FIRST_LOCATE_SPLIT_SECC || status == SEC_LOCATE_SPLIT_SECC)
 				{
-					cntLocSuc1++;
+					// 提取特征及真实的字符编号
+					writeFeatures(imageFname, fpFeatures, thinnerImg);
+					succPLCnt++;
+					cntLocSuc++;
 				}
-				else if (status == 2)
-				{
-					cntLocSuc2++;
-				}
-				fprintf(pfRes, "%s -> %s \n", imageFname, statusInfo(status));
-				printf("%s -> %d \n",imageFname, status);
+				fprintf(pfRes, "%s -> %s (%d) \n\n", imageFname, statusInfo(status), status);
+				printf("%s -> %s (%d) \n\n",imageFname, statusInfo(status), status);
 				strcpy(source, temp1);
 				strcpy(dest, temp2);
 			}
@@ -185,13 +205,14 @@ void goGoGo(char* src, int begin, int end){
 		}
 		
 	}
-	fprintf(pfRes, "totally handle %d photos! \n", cntLocFail + cntLocSuc1 + cntLocSuc2);
-	fprintf(pfRes, "失败: %d;  第一次定位成功: %d;  第二次定位成功: %d; 成功率: %d \n", cntLocFail, cntLocSuc1, cntLocSuc2, (cntLocFail / (cntLocFail + cntLocSuc1 + cntLocSuc2)*1.0));
-	printf("totally handle %d photos! \n", cntLocFail+ cntLocSuc1+ cntLocSuc2);
-	printf("失败: %d;  第一次定位成功: %d;  第二次定位成功: %d; 成功率: %d \n", cntLocFail, cntLocSuc1, cntLocSuc2, (cntLocFail/(cntLocFail+ cntLocSuc1+ cntLocSuc2)*1.0));
+	fprintf(pfRes, "\ntotally handle %d photos! \n", cntLocFail + cntLocSuc);
+	fprintf(pfRes, "失败: %d;  成功: %d; 成功率: %.2lf \n", cntLocFail, cntLocSuc, (cntLocSuc*1.0 / (cntLocFail + cntLocSuc)*1.0));
+	printf("\ntotally handle %d photos! \n", cntLocFail+ cntLocSuc);
+	printf("失败: %d;  成功: %d; 成功率: %.2lf \n\n", cntLocFail, cntLocSuc, (cntLocSuc*1.0 / (cntLocFail + cntLocSuc)*1.0));
 	
 	fclose(fpImgList);
 	fclose(pfRes);
+	fclose(fpFeatures);
 	return;
 }
 
@@ -200,14 +221,20 @@ char*	statusInfo(int status) {
 
 	switch (status)
 	{
-	case 1:
-		info = "第一次定位成功";
-		break;
-	case 2:
-		info = "第二次定位成功";
-		break;
-	default:
+	case LOCATE_FAIL:
 		info = "定位失败";
+		break;
+	case FIRST_LOCATE_SPLIT_SECC:
+		info = "第一次定位成功且切割成功";
+		break;
+	case SEC_LOCATE_SPLIT_SECC:
+		info = "第二次定位成功且切割成功";
+		break;
+	case FIRST_LOCATE_SPLIT_FAIL:
+		info = "第一次定位成功但切割失败";
+		break;
+	case SEC_LOCATE_SPLIT_FAIL:
+		info = "第二次定位成功但切割失败";
 		break;
 	}
 

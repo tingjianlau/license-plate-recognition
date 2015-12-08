@@ -18,12 +18,14 @@
     <ClInclude Include="utils.h" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="featuresExtract.c" />
     <ClCompile Include="fileManage.c" />
     <ClCompile Include="locatePL.c" />
     <ClCompile Include="locatePL_Clr.c" />
     <ClCompile Include="main.c" />
     <ClCompile Include="preprocess.c" />
     <ClCompile Include="test.c" />
+    <ClCompile Include="trainNetwork.c" />
     <ClCompile Include="utils.c" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
