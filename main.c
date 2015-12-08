@@ -37,7 +37,7 @@ char	weightSrc[PATH_MAX] = { 0 };
 int		succPLCnt = 0;	// 成功提取特征的车牌的数量
 int main(){
 	// 神经网络训练之前的工作：包括车牌的定位，切割，归一化，细化及特征提取
-	preTrain(TEMP, 1, 100);
+	preTrain(TEMP, 1, 1);
 
 	trainNetworkMain(features, weightSrc, 6* succPLCnt);
 	//FILE* fp;
